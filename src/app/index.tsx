@@ -52,9 +52,14 @@ export default function BookshelfScreen() {
             </Text>
           )}
         </View>
-        <Pressable onPress={() => router.push('/add')} style={styles.addButton} accessibilityRole="button" accessibilityLabel="Add books">
-          <Text style={styles.addText}>＋</Text>
-        </Pressable>
+        <View style={styles.headerButtons}>
+          <Pressable onPress={() => router.push('/settings')} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Settings">
+            <Text style={styles.iconText}>⚙</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/add')} style={styles.addButton} accessibilityRole="button" accessibilityLabel="Add books">
+            <Text style={styles.addText}>＋</Text>
+          </Pressable>
+        </View>
       </View>
 
       {loaded && books.length === 0 ? (
@@ -108,6 +113,9 @@ const styles = StyleSheet.create({
   },
   title: { color: Colors.text, fontSize: 30, fontFamily: Fonts.serif, fontWeight: '700' },
   subtitle: { color: Colors.textMuted, fontSize: 13, marginTop: 2 },
+  headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  iconText: { color: Colors.textMuted, fontSize: 22 },
   addButton: {
     width: 42,
     height: 42,

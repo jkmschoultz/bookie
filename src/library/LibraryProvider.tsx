@@ -1,3 +1,4 @@
+import { Directory, Paths } from 'expo-file-system';
 import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
@@ -13,6 +14,8 @@ interface Library {
   updateBook: (id: number, patch: Partial<NewBook>) => Promise<void>;
   setStatus: (id: number, status: ReadStatus) => Promise<void>;
   removeBook: (id: number) => Promise<void>;
+  /** Delete every book and any saved cover photos. */
+  eraseLibrary: () => Promise<void>;
   findByIsbn: (isbn13: string) => Book | undefined;
 }
 
@@ -76,6 +79,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [db],
   );
 
+  const eraseLibrary = useCallback(async () => {
+    await repo.deleteAllBooks(db);
+    const covers = new Directory(Paths.document, 'covers');
+    if (covers.exists) covers.delete();
+    setBooks([]);
+  }, [db]);
+
   const value = useMemo<Library>(() => {
     const byId = new Map(books.map((b) => [b.id, b]));
     return {
@@ -87,12 +97,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       addBooks,
       updateBook,
       removeBook,
+      eraseLibrary,
       setStatus: async (id, status) => {
         const book = byId.get(id);
         if (book) await updateBook(id, statusPatch(book, status));
       },
     };
-  }, [books, loaded, addBook, addBooks, updateBook, removeBook]);
+  }, [books, loaded, addBook, addBooks, updateBook, removeBook, eraseLibrary]);
 
   return <LibraryContext value={value}>{children}</LibraryContext>;
 }

@@ -119,6 +119,12 @@ export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> 
   await db.runAsync('DELETE FROM books WHERE id = ?', id);
 }
 
+export async function deleteAllBooks(db: SQLiteDatabase): Promise<void> {
+  await db.runAsync('DELETE FROM books');
+  // Restart ids from 1, as on a fresh install.
+  await db.runAsync("DELETE FROM sqlite_sequence WHERE name = 'books'");
+}
+
 export async function findByIsbn(db: SQLiteDatabase, isbn13: string): Promise<Book | null> {
   const row = await db.getFirstAsync<BookRow>('SELECT * FROM books WHERE isbn13 = ?', isbn13);
   return row ? fromRow(row) : null;

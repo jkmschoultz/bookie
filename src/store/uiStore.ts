@@ -16,13 +16,19 @@ interface UiState {
   toggleStatus: (status: ReadStatus) => void;
   clearStatusFilter: () => void;
   setDraft: (draft: BookDraft | null) => void;
+  /** Back to first-launch defaults. */
+  reset: () => void;
 }
 
-export const useUi = create<UiState>((set) => ({
+const DEFAULTS = {
   sortMode: 'genre',
   layoutMode: 'row',
   statusFilter: [],
   draft: null,
+} satisfies Pick<UiState, 'sortMode' | 'layoutMode' | 'statusFilter' | 'draft'>;
+
+export const useUi = create<UiState>((set) => ({
+  ...DEFAULTS,
   setSortMode: (sortMode) => set({ sortMode }),
   setLayoutMode: (layoutMode) => set({ layoutMode }),
   toggleStatus: (status) =>
@@ -31,4 +37,5 @@ export const useUi = create<UiState>((set) => ({
     })),
   clearStatusFilter: () => set({ statusFilter: [] }),
   setDraft: (draft) => set({ draft }),
+  reset: () => set(DEFAULTS),
 }));

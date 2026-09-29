@@ -34,6 +34,7 @@ export default function RootLayout() {
               <Stack screenOptions={{ headerTintColor: Colors.accent, headerTitleStyle: { color: Colors.text } }}>
                 <Stack.Screen name="index" options={{ headerShown: false }} />
                 <Stack.Screen name="book/[id]" options={{ title: '', presentation: 'modal' }} />
+                <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
                 <Stack.Screen name="add/index" options={{ title: 'Add books', presentation: 'modal' }} />
                 <Stack.Screen name="add/search" options={{ title: 'Search' }} />
                 <Stack.Screen name="add/scan" options={{ title: 'Scan barcode' }} />
