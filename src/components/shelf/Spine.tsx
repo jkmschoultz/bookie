@@ -4,7 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Colors, Fonts } from '@/constants/theme';
-import type { SpineStyle } from '@/shelf/spineStyle';
+import { DECORATION, type SpineStyle } from '@/shelf/spineStyle';
+import { LINE_HEIGHT } from '@/shelf/spineText';
 import type { Book } from '@/types';
 
 interface Props {
@@ -16,26 +17,31 @@ interface Props {
 
 const SHADING = ['rgba(0,0,0,0.38)', 'rgba(255,255,255,0.14)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.3)'] as const;
 const SHADING_STOPS = [0, 0.22, 0.55, 1] as const;
-const TEXT_PAD = 14;
 
+/** Spine ornaments. The text is set clear of them (see TEXT_INSETS in spineStyle), and the label box wraps the title. */
 function Decoration({ s }: { s: SpineStyle }) {
   const band = { backgroundColor: s.accentColor, left: 0, right: 0, position: 'absolute' as const };
+  const { bands } = DECORATION;
   switch (s.decoration) {
     case 'bands':
       return (
         <>
-          <View style={[band, { top: 8, height: 2 }]} />
-          <View style={[band, { top: 12, height: 1 }]} />
-          <View style={[band, { bottom: 12, height: 1 }]} />
-          <View style={[band, { bottom: 8, height: 2 }]} />
+          <View style={[band, { top: bands.outer, height: 2 }]} />
+          <View style={[band, { top: bands.inner, height: 1 }]} />
+          <View style={[band, { bottom: bands.inner, height: 1 }]} />
+          <View style={[band, { bottom: bands.outer, height: 2 }]} />
         </>
       );
     case 'band':
-      return <View style={[band, { top: '14%', height: 10, opacity: 0.85 }]} />;
-    case 'label':
-      return <View style={[styles.label, { borderColor: s.accentColor }]} />;
+      return <View style={[band, { top: DECORATION.band.top, height: DECORATION.band.height, opacity: 0.85 }]} />;
+    case 'label': {
+      const pad = DECORATION.labelPad;
+      const top = s.text.start - pad;
+      const height = Math.min(s.text.titleLength + 2 * pad, s.height - top - s.text.end + pad);
+      return <View style={[styles.label, { top, height, borderColor: s.accentColor }]} />;
+    }
     case 'frame':
-      return <View style={[styles.frame, { borderColor: s.accentColor }]} />;
+      return <View style={[styles.frame, { top: DECORATION.frame, bottom: DECORATION.frame, borderColor: s.accentColor }]} />;
     default:
       return null;
   }
@@ -48,9 +54,9 @@ function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
     zIndex: lift.value > 0 ? 10 : 0,
   }));
 
-  const titleSize = Math.max(7, Math.min(13, s.width * 0.42));
-  const showAuthor = s.width >= 20;
-  const textLength = s.height - TEXT_PAD * 2;
+  const { text } = s;
+  // The text runs between its insets, which differ per decoration (e.g. more room below a band at the top).
+  const textLength = s.height - text.start - text.end;
   const faded = book.status === 'want' && !book.owned;
 
   const open = () => {
@@ -88,24 +94,27 @@ function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
                 width: textLength,
                 height: s.width,
                 left: (s.width - textLength) / 2,
-                top: (s.height - s.width) / 2,
+                top: (s.height - s.width) / 2 + (text.start - text.end) / 2,
               },
             ]}>
+            {/* Lines are pre-fitted to the spine (shrunk or wrapped), so nothing should be cut off. */}
             <Text
-              numberOfLines={1}
+              numberOfLines={text.numberOfLines}
               style={{
                 flexShrink: 1,
                 color: s.textColor,
-                fontSize: titleSize,
+                fontSize: text.fontSize,
+                lineHeight: text.fontSize * LINE_HEIGHT,
+                textAlign: text.lines.length > 1 ? 'center' : 'left',
                 fontFamily: s.font === 'serif' ? Fonts.serif : Fonts.sans,
                 fontWeight: s.font === 'sans' ? '700' : '600',
                 letterSpacing: s.uppercase ? 0.8 : 0.2,
               }}>
-              {s.uppercase ? book.title.toUpperCase() : book.title}
+              {text.lines.join('\n')}
             </Text>
-            {showAuthor && (
-              <Text numberOfLines={1} style={[styles.author, { color: s.textColor, fontSize: Math.max(7, titleSize * 0.72), maxWidth: textLength * 0.4 }]}>
-                {book.authors[0]?.split(' ').at(-1) ?? ''}
+            {text.author && (
+              <Text numberOfLines={1} style={[styles.author, { color: s.textColor, fontSize: text.authorSize, maxWidth: textLength * 0.4 }]}>
+                {text.author}
               </Text>
             )}
           </View>
@@ -140,8 +149,6 @@ const styles = StyleSheet.create({
   },
   label: {
     position: 'absolute',
-    top: '30%',
-    bottom: '30%',
     left: 3,
     right: 3,
     borderWidth: 1,
@@ -150,8 +157,6 @@ const styles = StyleSheet.create({
   },
   frame: {
     position: 'absolute',
-    top: 5,
-    bottom: 5,
     left: 3,
     right: 3,
     borderWidth: StyleSheet.hairlineWidth * 2,

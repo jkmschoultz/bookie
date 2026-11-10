@@ -50,52 +50,60 @@ export default function SearchScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Title, author or ISBN"
-        placeholderTextColor={Colors.textMuted}
-        autoFocus
-        returnKeyType="search"
-        style={styles.input}
-      />
-      {searching && !tooShort && <ActivityIndicator color={Colors.accent} style={{ marginTop: 12 }} />}
-      {error && <Text style={styles.error}>{error}</Text>}
-      <FlatList
-        data={tooShort ? [] : results}
-        keyExtractor={(d) => d.key}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: 40 }}
-        renderItem={({ item }) => (
-          <Pressable style={({ pressed }) => [styles.result, pressed && { backgroundColor: Colors.surface }]} onPress={() => choose(item)} disabled={!!opening}>
-            {item.cover_i ? (
-              <Image source={coverUrl(item.cover_i, 'S')} style={styles.thumb} contentFit="cover" />
-            ) : (
-              <View style={[styles.thumb, { backgroundColor: Colors.surfaceRaised }]} />
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title} numberOfLines={2}>
-                {item.title}
-              </Text>
-              <Text style={styles.meta} numberOfLines={1}>
-                {[item.author_name?.join(', '), item.first_publish_year].filter(Boolean).join(' · ')}
-              </Text>
-              {item.number_of_pages_median && <Text style={styles.meta}>{item.number_of_pages_median} pages</Text>}
-            </View>
-            {opening === item.key && <ActivityIndicator color={Colors.accent} />}
-          </Pressable>
-        )}
-        ListEmptyComponent={
-          !searching && !tooShort && !error ? <Text style={styles.empty}>No books found.</Text> : null
-        }
-      />
-    </View>
+    // The list is the screen's main container so iOS can inset it below the see-through header; the search box
+    // rides at the top of it.
+    <FlatList
+      data={tooShort ? [] : results}
+      keyExtractor={(d) => d.key}
+      keyboardShouldPersistTaps="handled"
+      contentInsetAdjustmentBehavior="automatic"
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Title, author or ISBN"
+            placeholderTextColor={Colors.textMuted}
+            autoFocus
+            returnKeyType="search"
+            style={styles.input}
+          />
+          {searching && !tooShort && <ActivityIndicator color={Colors.accent} style={{ marginTop: 12 }} />}
+          {error && <Text style={styles.error}>{error}</Text>}
+        </View>
+      }
+      renderItem={({ item }) => (
+        <Pressable style={({ pressed }) => [styles.result, pressed && { backgroundColor: Colors.surface }]} onPress={() => choose(item)} disabled={!!opening}>
+          {item.cover_i ? (
+            <Image source={coverUrl(item.cover_i, 'S')} style={styles.thumb} contentFit="cover" />
+          ) : (
+            <View style={[styles.thumb, { backgroundColor: Colors.surfaceRaised }]} />
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Text style={styles.meta} numberOfLines={1}>
+              {[item.author_name?.join(', '), item.first_publish_year].filter(Boolean).join(' · ')}
+            </Text>
+            {item.number_of_pages_median && <Text style={styles.meta}>{item.number_of_pages_median} pages</Text>}
+          </View>
+          {opening === item.key && <ActivityIndicator color={Colors.accent} />}
+        </Pressable>
+      )}
+      ListEmptyComponent={
+        !searching && !tooShort && !error ? <Text style={styles.empty}>No books found.</Text> : undefined
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, padding: 16 },
+  screen: { flex: 1 },
+  content: { padding: 16, paddingBottom: 40 },
+  header: { marginBottom: 4 },
   input: {
     color: Colors.text,
     backgroundColor: Colors.surface,

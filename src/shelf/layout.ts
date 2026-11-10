@@ -3,6 +3,7 @@ import type { Book } from '@/types';
 import type { ShelfGroup } from './grouping';
 import { hashUnit } from './hash';
 import { getSpineStyle, type SpineStyle } from './spineStyle';
+import { textWidth } from './textWidth';
 
 export type LayoutMode = 'row' | 'wrap';
 
@@ -30,7 +31,14 @@ export interface BookendItem {
   width: number;
 }
 
-export type ShelfItem = SpineItem | StackItem | BookendItem;
+/** Empty shelf space, left so a group's label plate doesn't run into the next group's. */
+export interface SpaceItem {
+  kind: 'space';
+  key: string;
+  width: number;
+}
+
+export type ShelfItem = SpineItem | StackItem | BookendItem | SpaceItem;
 
 /** A brass label plate on the shelf edge, positioned under the group's first book. */
 export interface ShelfLabel {
@@ -39,6 +47,8 @@ export interface ShelfLabel {
   count: number;
   /** Offset from the start of the row's content, in px. */
   x: number;
+  /** Room the plate needs, including the space before the next plate. */
+  width: number;
 }
 
 export interface ShelfRow {
@@ -60,6 +70,19 @@ export interface LayoutOptions {
 }
 
 export const BOOKEND_WIDTH = 12;
+/** Plates wider than this are cut off with "…"; only very long group names get there. */
+export const LABEL_MAX_WIDTH = 260;
+/** The label plate's text: 11px bold, as styled in ShelfRow. */
+const LABEL_FONT_SIZE = 11;
+const LABEL_LETTER_SPACING = 0.6;
+const LABEL_PADDING = 8;
+const LABEL_SPACING = 6;
+
+/** Width of a group's brass label plate ("Fantasy  9"), matching the plate styles in ShelfRow. */
+export function labelPlateWidth(label: string, count: number): number {
+  const text = textWidth(`${label}  ${count}`, LABEL_FONT_SIZE, { letterSpacing: LABEL_LETTER_SPACING });
+  return Math.ceil(Math.min(LABEL_MAX_WIDTH, text + 2 * LABEL_PADDING) + LABEL_SPACING);
+}
 const STACK_CHANCE = 0.4;
 const STACK_MIN_GROUP = 5;
 /** Room for the books in a pile to sit slightly out of line. */
@@ -138,32 +161,44 @@ export function layoutShelves(groups: ShelfGroup[], opts: LayoutOptions): ShelfR
     items.push(item);
   };
   const fits = (w: number) => width + (items.length ? gap : 0) + w <= opts.shelfWidth;
-  const startGroup = (group: ShelfGroup) => {
-    if (items.length) place({ kind: 'bookend', key: `end:${group.key}`, width: BOOKEND_WIDTH });
-    labels.push({ groupKey: group.key, label: group.label, count: group.books.length, x: width + (items.length ? gap : 0) });
+  /** Space still needed after a bookend so the previous group's plate ends before the next one starts. */
+  const plateRoom = () => {
+    const prev = labels.at(-1);
+    return prev ? Math.max(0, prev.x + prev.width - (width + gap + BOOKEND_WIDTH + gap)) : 0;
+  };
+  /** Whether a new group, whose first stretch is `first` wide, can still start on this shelf. */
+  const groupFits = (first: number, plate: number) => fits(BOOKEND_WIDTH + gap + plateRoom() + Math.max(first, plate));
+  const startGroup = (group: ShelfGroup, plate: number) => {
+    if (items.length) {
+      const room = plateRoom();
+      place({ kind: 'bookend', key: `end:${group.key}`, width: BOOKEND_WIDTH });
+      if (room > 0) place({ kind: 'space', key: `space:${group.key}`, width: room });
+    }
+    labels.push({ groupKey: group.key, label: group.label, count: group.books.length, x: width + (items.length ? gap : 0), width: plate });
   };
 
   for (const group of groups) {
     const groupItems = itemsForGroup(group, scale, maxStackHeight);
+    const plate = labelPlateWidth(group.label, group.books.length);
 
     if (opts.mode === 'row') {
       const groupWidth = rowWidth(groupItems, gap);
       if (groupWidth > opts.shelfWidth) {
         flush();
-        startGroup(group);
+        startGroup(group, plate);
         groupItems.forEach(place);
         flush();
         continue;
       }
-      if (items.length && !fits(BOOKEND_WIDTH + gap + groupWidth)) flush();
-      startGroup(group);
+      if (items.length && !groupFits(groupWidth, plate)) flush();
+      startGroup(group, plate);
       groupItems.forEach(place);
       continue;
     }
 
-    // Start a new shelf if not even the bookend and first book fit on this one.
-    if (items.length && !fits(BOOKEND_WIDTH + gap + groupItems[0].width)) flush();
-    startGroup(group);
+    // Start a new shelf if not even the bookend and first book (or the label, if wider) fit on this one.
+    if (items.length && !groupFits(groupItems[0].width, plate)) flush();
+    startGroup(group, plate);
     for (const item of groupItems) {
       if (items.length && !fits(item.width)) flush();
       place(item);

@@ -1,9 +1,10 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alert } from '@/components/alert';
 import { Chip } from '@/components/Chip';
 import { Cover } from '@/components/Cover';
 import { StarRating } from '@/components/StarRating';
@@ -40,7 +41,7 @@ function BookDetails({ book }: { book: Book }) {
   ].filter(Boolean);
 
   const remove = () =>
-    Alert.alert('Remove book?', `“${book.title}” will be taken off your shelves.`, [
+    alert('Remove book?', `“${book.title}” will be taken off your shelves.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -63,7 +64,7 @@ function BookDetails({ book }: { book: Book }) {
           ),
         }}
       />
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
         <Animated.View entering={ZoomIn.springify().damping(16)} style={styles.coverWrap}>
           <Cover book={book} width={170} />
         </Animated.View>

@@ -1,6 +1,7 @@
 import type { Book } from '@/types';
 
 import { hashUnit } from './hash';
+import { END_PAD, fitSpineText, type SpineText } from './spineText';
 
 export const SPINE = {
   /** Spine thickness per page, in layout px. A 300-page book ≈ 26px. */
@@ -25,6 +26,29 @@ const PALETTE = [
 
 export type SpineDecoration = 'plain' | 'bands' | 'band' | 'label' | 'frame';
 const DECORATIONS: SpineDecoration[] = ['plain', 'bands', 'band', 'label', 'frame', 'bands'];
+/** Styles that show off a second cover colour: a thick band, thin top and bottom bands, or an inset frame. */
+const ACCENT_DECORATIONS: SpineDecoration[] = ['band', 'bands', 'frame'];
+
+/** Where decorations are drawn along the spine, in px from its ends (drawn in Spine.tsx). */
+export const DECORATION = {
+  /** The thick band near the top. */
+  band: { top: 8, height: 10 },
+  /** Double rules at each end: a 2px and a 1px line, 8px to 13px from the end. */
+  bands: { outer: 8, inner: 12 },
+  /** The inset frame. */
+  frame: 5,
+  /** Space between the label box and the title it surrounds. */
+  labelPad: 5,
+} as const;
+
+/** Clear space kept between the text and each end of the spine, so decorations frame the text instead of crossing it. */
+const TEXT_INSETS: Record<SpineDecoration, { start: number; end: number }> = {
+  plain: { start: END_PAD, end: END_PAD },
+  label: { start: END_PAD, end: END_PAD }, // the box is drawn around the title itself
+  frame: { start: 16, end: 16 },
+  bands: { start: 22, end: 22 },
+  band: { start: DECORATION.band.top + DECORATION.band.height + 10, end: END_PAD },
+};
 
 export type SpineFont = 'serif' | 'sans';
 
@@ -37,6 +61,8 @@ export interface SpineStyle {
   decoration: SpineDecoration;
   font: SpineFont;
   uppercase: boolean;
+  /** How the title (and author) are set on the spine. */
+  text: SpineText;
 }
 
 function clamp(v: number, min: number, max: number) {
@@ -83,16 +109,25 @@ export function contrastText(bg: string): string {
 
 export function getSpineStyle(book: Book, scale = 1): SpineStyle {
   const seed = bookSeed(book);
-  const color = book.spineColor ?? PALETTE[Math.floor(hashUnit(seed, 'c') * PALETTE.length)];
+  // A colour the user picked wins; otherwise the cover's colours; otherwise one from the palette.
+  const [coverColor, coverAccent] = book.spineColor ? [] : (book.coverPalette ?? []);
+  const color = book.spineColor ?? coverColor ?? PALETTE[Math.floor(hashUnit(seed, 'c') * PALETTE.length)];
   const light = relativeLuminance(color) > 0.33;
+  const decorations = coverAccent ? ACCENT_DECORATIONS : DECORATIONS;
+  const width = spineWidth(book.pageCount, scale);
+  const height = spineHeight(book, scale);
+  const decoration = decorations[Math.floor(hashUnit(seed, 'd') * decorations.length)];
+  const font: SpineFont = hashUnit(seed, 'f') < 0.6 ? 'serif' : 'sans';
+  const uppercase = hashUnit(seed, 'u') < 0.45;
   return {
-    width: spineWidth(book.pageCount, scale),
-    height: spineHeight(book, scale),
+    width,
+    height,
     color,
     textColor: contrastText(color),
-    accentColor: light ? '#7a5c1e' : '#d4af61',
-    decoration: DECORATIONS[Math.floor(hashUnit(seed, 'd') * DECORATIONS.length)],
-    font: hashUnit(seed, 'f') < 0.6 ? 'serif' : 'sans',
-    uppercase: hashUnit(seed, 'u') < 0.45,
+    accentColor: coverAccent ?? (light ? '#7a5c1e' : '#d4af61'),
+    decoration,
+    font,
+    uppercase,
+    text: fitSpineText(book.title, book.authors[0], { width, height, font, uppercase, ...TEXT_INSETS[decoration] }),
   };
 }

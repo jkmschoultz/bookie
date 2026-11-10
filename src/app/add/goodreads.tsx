@@ -1,14 +1,13 @@
 import { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 
 import { ImportStatus } from '@/components/ImportStatus';
 import { Colors } from '@/constants/theme';
 import { useGoodreadsImport } from '@/library/useGoodreadsImport';
-import { isExportDownload, isSignInPage } from '@/services/import/goodreadsCsv';
-
-const EXPORT_PAGE = 'https://www.goodreads.com/review/import';
+import { GOODREADS_EXPORT_PAGE as EXPORT_PAGE, isExportDownload, isSignInPage } from '@/services/import/goodreadsCsv';
 
 /** Runs inside the page, so the request carries the user's Goodreads login. */
 function fetchScript(url: string): string {
@@ -26,7 +25,9 @@ function fetchScript(url: string): string {
  * link, the CSV is fetched straight into Bookie instead of being downloaded.
  */
 export default function GoodreadsWebImport() {
-  const web = useRef<WebView>(null);
+  // WebView<object>: react-native-webview 14 defaults its extra-props parameter to `undefined`, which makes every prop `never`.
+  const web = useRef<WebView<object>>(null);
+  const insets = useSafeAreaInsets();
   const [capturing, setCapturing] = useState(false);
   /** Set while the user is signing in, so we can take them back to the export page afterwards. */
   const signingIn = useRef(false);
@@ -70,15 +71,35 @@ export default function GoodreadsWebImport() {
 
   if (phase.kind === 'enriching' || phase.kind === 'done') {
     return (
-      <ScrollView contentContainerStyle={styles.status}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.status}>
         <ImportStatus phase={phase} />
       </ScrollView>
     );
   }
 
   return (
+    // Web page first so iOS can inset it below the see-through header; the status banner sits underneath it.
     <View style={{ flex: 1 }}>
-      <View style={styles.banner}>
+      <WebView<object>
+        ref={web}
+        source={{ uri: EXPORT_PAGE }}
+        onShouldStartLoadWithRequest={onShouldStart}
+        onFileDownload={(e) => capture(e.nativeEvent.downloadUrl)}
+        onOpenWindow={(e) => {
+          // Links that open a new window: grab the export, load anything else in place.
+          const url = e.nativeEvent.targetUrl;
+          if (isExportDownload(url)) capture(url);
+          else web.current?.injectJavaScript(`window.location.href = ${JSON.stringify(url)}; true;`);
+        }}
+        onMessage={onMessage}
+        onLoadEnd={(e) => onLoadEnd(e.nativeEvent.url)}
+        sharedCookiesEnabled
+        contentInsetAdjustmentBehavior="automatic"
+        startInLoadingState
+        renderLoading={() => <ActivityIndicator color={Colors.accent} style={StyleSheet.absoluteFill} />}
+        style={{ flex: 1 }}
+      />
+      <View style={[styles.banner, { paddingBottom: 12 + insets.bottom }]}>
         {capturing && phase.kind !== 'error' ? (
           <View style={styles.row}>
             <ActivityIndicator color={Colors.accent} />
@@ -93,30 +114,12 @@ export default function GoodreadsWebImport() {
           </Text>
         )}
       </View>
-      <WebView
-        ref={web}
-        source={{ uri: EXPORT_PAGE }}
-        onShouldStartLoadWithRequest={onShouldStart}
-        onFileDownload={(e) => capture(e.nativeEvent.downloadUrl)}
-        onOpenWindow={(e) => {
-          // Links that open a new window: grab the export, load anything else in place.
-          const url = e.nativeEvent.targetUrl;
-          if (isExportDownload(url)) capture(url);
-          else web.current?.injectJavaScript(`window.location.href = ${JSON.stringify(url)}; true;`);
-        }}
-        onMessage={onMessage}
-        onLoadEnd={(e) => onLoadEnd(e.nativeEvent.url)}
-        sharedCookiesEnabled
-        startInLoadingState
-        renderLoading={() => <ActivityIndicator color={Colors.accent} style={StyleSheet.absoluteFill} />}
-        style={{ flex: 1 }}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  banner: { padding: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  banner: { padding: 12, backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border },
   bannerText: { color: Colors.textMuted, fontSize: 13, lineHeight: 18 },
   row: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   status: { padding: 20, gap: 16 },

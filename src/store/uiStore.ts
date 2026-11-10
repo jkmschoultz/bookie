@@ -1,4 +1,6 @@
+import Storage from 'expo-sqlite/kv-store';
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { SortMode } from '@/shelf/grouping';
 import type { LayoutMode } from '@/shelf/layout';
@@ -27,15 +29,21 @@ const DEFAULTS = {
   draft: null,
 } satisfies Pick<UiState, 'sortMode' | 'layoutMode' | 'statusFilter' | 'draft'>;
 
-export const useUi = create<UiState>((set) => ({
-  ...DEFAULTS,
-  setSortMode: (sortMode) => set({ sortMode }),
-  setLayoutMode: (layoutMode) => set({ layoutMode }),
-  toggleStatus: (status) =>
-    set((s) => ({
-      statusFilter: s.statusFilter.includes(status) ? s.statusFilter.filter((x) => x !== status) : [...s.statusFilter, status],
-    })),
-  clearStatusFilter: () => set({ statusFilter: [] }),
-  setDraft: (draft) => set({ draft }),
-  reset: () => set(DEFAULTS),
-}));
+export const useUi = create<UiState>()(
+  // Only the shelf layout is a lasting preference (set in Settings); the rest starts fresh each launch.
+  persist(
+    (set) => ({
+      ...DEFAULTS,
+      setSortMode: (sortMode) => set({ sortMode }),
+      setLayoutMode: (layoutMode) => set({ layoutMode }),
+      toggleStatus: (status) =>
+        set((s) => ({
+          statusFilter: s.statusFilter.includes(status) ? s.statusFilter.filter((x) => x !== status) : [...s.statusFilter, status],
+        })),
+      clearStatusFilter: () => set({ statusFilter: [] }),
+      setDraft: (draft) => set({ draft }),
+      reset: () => set(DEFAULTS),
+    }),
+    { name: 'ui', storage: createJSONStorage(() => Storage), partialize: (s) => ({ layoutMode: s.layoutMode }) },
+  ),
+);

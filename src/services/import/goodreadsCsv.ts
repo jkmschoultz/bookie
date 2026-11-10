@@ -79,7 +79,8 @@ export function rowToBook(row: GoodreadsRow): NewBook | null {
 }
 
 export function parseGoodreadsCsv(csv: string): GoodreadsImport {
-  const parsed = Papa.parse<GoodreadsRow>(csv.replace(/^﻿/, ''), { header: true, skipEmptyLines: true });
+  // trimStart also drops the BOM, and any blank lines or spaces picked up when the export is copied off a web page.
+  const parsed = Papa.parse<GoodreadsRow>(csv.trimStart(), { header: true, skipEmptyLines: true });
   const books: NewBook[] = [];
   let skipped = 0;
   for (const row of parsed.data) {
@@ -99,6 +100,9 @@ function splitUrl(url: string): { host: string; path: string } | null {
   const m = url.match(/^https?:\/\/([^/?#]+)([^?#]*)/i);
   return m ? { host: m[1].toLowerCase(), path: m[2] } : null;
 }
+
+/** Goodreads' Import and export page, where the "Export Library" button lives. */
+export const GOODREADS_EXPORT_PAGE = 'https://www.goodreads.com/review/import';
 
 const isGoodreadsHost = (host: string) => /(^|\.)goodreads\.com$/.test(host);
 

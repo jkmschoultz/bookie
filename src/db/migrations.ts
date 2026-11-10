@@ -30,6 +30,9 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_books_isbn13 ON books(isbn13);
   `,
+  `
+  ALTER TABLE books ADD COLUMN cover_palette TEXT;
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {

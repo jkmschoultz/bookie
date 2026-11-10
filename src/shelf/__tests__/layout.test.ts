@@ -1,7 +1,7 @@
 import { makeBook } from '@/test/makeBook';
 
 import type { ShelfGroup } from '../grouping';
-import { layoutShelves } from '../layout';
+import { LABEL_MAX_WIDTH, labelPlateWidth, layoutShelves } from '../layout';
 
 function group(key: string, n: number, pages = 300): ShelfGroup {
   return { key, label: key, books: Array.from({ length: n }, (_, i) => makeBook({ title: `${key} ${i}`, pageCount: pages })) };
@@ -65,5 +65,31 @@ describe('layoutShelves', () => {
   it('never stacks books in small groups', () => {
     const rows = layoutShelves([group('small', 3)], { mode: 'row', shelfWidth: 300 });
     expect(rows[0].items.every((i) => i.kind === 'spine')).toBe(true);
+  });
+});
+
+describe('label plates', () => {
+  // Many one-book groups with long names, like sorting by author: narrower than their labels.
+  const names = ['Graphic Novels', 'History', 'Science & Nature', 'Biography & Memoir', 'Poetry', 'Philosophy', 'Psychology', 'Cooking'];
+  const small = names.map((name) => ({ ...group(name, 1 + (name.length % 2)), label: name }));
+
+  for (const mode of ['row', 'wrap'] as const) {
+    it(`never overlap and stay on the shelf in ${mode} mode`, () => {
+      const rows = layoutShelves(small, { mode, shelfWidth: 340, gap: 1 });
+      expect(bookCount(rows)).toBe(small.reduce((n, g) => n + g.books.length, 0));
+      for (const row of rows) {
+        row.labels.forEach((label, i) => {
+          expect(label.width).toBe(labelPlateWidth(label.label, label.count));
+          const next = row.labels[i + 1];
+          if (next) expect(next.x).toBeGreaterThanOrEqual(label.x + label.width);
+          else expect(label.x + label.width).toBeLessThanOrEqual(340 + 6); // the last plate may use the spacing margin
+        });
+      }
+    });
+  }
+
+  it('sizes plates to their text, longer names getting wider plates', () => {
+    expect(labelPlateWidth('Biography & Memoir', 12)).toBeGreaterThan(labelPlateWidth('Poetry', 1));
+    expect(labelPlateWidth('x'.repeat(200), 1)).toBe(LABEL_MAX_WIDTH + 6);
   });
 });
