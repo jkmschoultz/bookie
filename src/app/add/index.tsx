@@ -1,5 +1,5 @@
 import { router, type Href } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useUi } from '@/store/uiStore';
@@ -14,7 +14,7 @@ const OPTIONS: { href: Href; icon: string; title: string; body: string }[] = [
 export default function AddScreen() {
   const setDraft = useUi((s) => s.setDraft);
   return (
-    <View style={styles.list}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}>
       {OPTIONS.map((o) => (
         <Pressable
           key={o.title}
@@ -30,7 +30,7 @@ export default function AddScreen() {
           </View>
         </Pressable>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 

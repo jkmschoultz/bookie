@@ -2,8 +2,9 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alert } from '@/components/alert';
 import { Colors } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
 import { lookupIsbn } from '@/services/metadata/lookup';
@@ -32,7 +33,7 @@ export default function ScanScreen() {
 
     const existing = findByIsbn(data);
     if (existing) {
-      Alert.alert('Already on your shelves', existing.title, [
+      alert('Already on your shelves', existing.title, [
         { text: 'Scan another', onPress: reset },
         { text: 'Open', onPress: () => router.replace({ pathname: '/book/[id]', params: { id: String(existing.id) } }) },
       ]);
@@ -46,7 +47,7 @@ export default function ScanScreen() {
       router.replace('/add/manual');
       return;
     }
-    Alert.alert('Book not found', `No details found for ISBN ${data}. You can enter them yourself.`, [
+    alert('Book not found', `No details found for ISBN ${data}. You can enter them yourself.`, [
       { text: 'Scan again', onPress: reset },
       {
         text: 'Enter manually',

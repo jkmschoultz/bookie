@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Fonts } from '@/constants/theme';
 import { hashUnit } from '@/shelf/hash';
 import { STACK_JITTER, type StackItem } from '@/shelf/layout';
+import { LINE_HEIGHT } from '@/shelf/spineText';
 import type { Book } from '@/types';
 
 interface Props {
@@ -33,16 +34,20 @@ function BookStackComponent({ item, onOpen, onLongPress }: Props) {
             style={{ width: s.height, height: s.width, marginLeft: STACK_JITTER / 2 + offset }}>
             <View style={[styles.book, { backgroundColor: s.color }]}>
               <LinearGradient colors={SHADING} style={StyleSheet.absoluteFill} />
+              {/* Same fitted lines as the upright spine: a book on its side has the same spine. */}
               {s.width >= 12 && (
                 <Text
-                  numberOfLines={1}
+                  numberOfLines={s.text.numberOfLines}
                   style={{
                     color: s.textColor,
                     fontFamily: s.font === 'serif' ? Fonts.serif : Fonts.sans,
-                    fontSize: Math.max(7, Math.min(12, s.width * 0.42)),
+                    fontSize: s.text.fontSize,
+                    lineHeight: s.text.fontSize * LINE_HEIGHT,
+                    textAlign: 'center',
+                    letterSpacing: s.uppercase ? 0.8 : 0.2,
                     paddingHorizontal: 8,
                   }}>
-                  {s.uppercase ? book.title.toUpperCase() : book.title}
+                  {s.text.lines.join('\n')}
                 </Text>
               )}
             </View>

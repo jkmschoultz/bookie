@@ -1,11 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useMemo } from 'react';
-import { FlatList, StyleSheet, View, useWindowDimensions, type ListRenderItem } from 'react-native';
+import { FlatList, Platform, StyleSheet, View, useWindowDimensions, type ListRenderItem } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Shelf, Wood } from '@/constants/theme';
-import { groupBooks, type SortMode } from '@/shelf/grouping';
+import { combineRanges, groupBooks, type ShelfGroup, type SortMode } from '@/shelf/grouping';
 import { layoutShelves, type LayoutMode, type ShelfRow as Row } from '@/shelf/layout';
+import { spineWidth } from '@/shelf/spineStyle';
 import type { Book } from '@/types';
 
 import { SHELF_ROW_HEIGHT, ShelfRow } from './ShelfRow';
@@ -27,10 +28,12 @@ export function Bookcase({ books, sortMode, layoutMode, onOpen, onLongPress, bot
   const { width } = useWindowDimensions();
   const shelfWidth = width - 2 * (Shelf.gutter + Shelf.sidePanel);
 
-  const rows = useMemo(
-    () => layoutShelves(groupBooks(books, sortMode), { mode: layoutMode, shelfWidth, gap: Shelf.gap }),
-    [books, sortMode, layoutMode, shelfWidth],
-  );
+  const rows = useMemo(() => {
+    // Letters and decades are combined into ranges of about a screen of books each ("A–D", "1960s–1980s").
+    const widthOf = (g: ShelfGroup) => g.books.reduce((w, b) => w + spineWidth(b.pageCount) + Shelf.gap, 0);
+    const groups = combineRanges(groupBooks(books, sortMode), shelfWidth, widthOf);
+    return layoutShelves(groups, { mode: layoutMode, shelfWidth, gap: Shelf.gap });
+  }, [books, sortMode, layoutMode, shelfWidth]);
 
   const renderRow = useCallback<ListRenderItem<Row>>(
     ({ item }) => <ShelfRow row={item} scrollable={item.width > shelfWidth} onOpen={onOpen} onLongPress={onLongPress} />,
@@ -47,6 +50,8 @@ export function Bookcase({ books, sortMode, layoutMode, onOpen, onLongPress, bot
           renderItem={renderRow}
           getItemLayout={(_, index) => ({ length: SHELF_ROW_HEIGHT, offset: SHELF_ROW_HEIGHT * index, index })}
           snapToInterval={SHELF_ROW_HEIGHT}
+          // react-native-web ignores snapToInterval; its pagingEnabled is CSS scroll-snap on each row, which matches it.
+          pagingEnabled={Platform.OS === 'web'}
           snapToAlignment="start"
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}

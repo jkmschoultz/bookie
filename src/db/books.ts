@@ -18,6 +18,7 @@ interface BookRow {
   cover_url: string | null;
   height_mm: number | null;
   spine_color: string | null;
+  cover_palette: string | null;
   source: Book['source'];
   status: Book['status'];
   rating: number | null;
@@ -44,6 +45,7 @@ const COLUMNS = {
   coverUrl: 'cover_url',
   heightMm: 'height_mm',
   spineColor: 'spine_color',
+  coverPalette: 'cover_palette',
   source: 'source',
   status: 'status',
   rating: 'rating',
@@ -71,6 +73,7 @@ function fromRow(r: BookRow): Book {
     coverUrl: r.cover_url,
     heightMm: r.height_mm,
     spineColor: r.spine_color,
+    coverPalette: r.cover_palette == null ? null : JSON.parse(r.cover_palette),
     source: r.source,
     status: r.status,
     rating: r.rating,
@@ -85,6 +88,7 @@ function fromRow(r: BookRow): Book {
 function toValue(key: keyof NewBook, value: unknown): SQLiteBindValue {
   if (key === 'authors' || key === 'genres') return JSON.stringify(value ?? []);
   if (key === 'owned') return value ? 1 : 0;
+  if (key === 'coverPalette') return value == null ? null : JSON.stringify(value);
   return (value ?? null) as SQLiteBindValue;
 }
 
@@ -117,6 +121,11 @@ export async function updateBook(db: SQLiteDatabase, id: number, patch: Partial<
 
 export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM books WHERE id = ?', id);
+}
+
+export async function deleteBooks(db: SQLiteDatabase, ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  await db.runAsync(`DELETE FROM books WHERE id IN (${ids.map(() => '?').join(', ')})`, ids);
 }
 
 export async function deleteAllBooks(db: SQLiteDatabase): Promise<void> {

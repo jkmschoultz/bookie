@@ -2,8 +2,9 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { alert } from '@/components/alert';
 import { Chip } from '@/components/Chip';
 import { Cover } from '@/components/Cover';
 import { Colors } from '@/constants/theme';
@@ -74,8 +75,9 @@ function fromForm(f: Form, base: BookDraft): BookDraft {
   };
 }
 
-/** Copy a picked photo out of the cache so it survives. */
+/** Copy a picked photo out of the cache so it survives. On web the picker gives a data: URI, which is stored as is. */
 async function persistPhoto(uri: string): Promise<string> {
+  if (Platform.OS === 'web') return uri;
   const dir = new Directory(Paths.document, 'covers');
   dir.create({ idempotent: true });
   const dest = new File(dir, `${Date.now()}.jpg`);
@@ -116,7 +118,7 @@ export default function BookFormScreen() {
   const save = async () => {
     const book = fromForm(form, base);
     if (!book.title) {
-      Alert.alert('A title is needed');
+      alert('A title is needed');
       return;
     }
     if (editing) {
@@ -153,7 +155,7 @@ export default function BookFormScreen() {
           ),
         }}
       />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.coverRow}>
           <Cover key={form.coverUrl ?? 'none'} book={preview} width={96} />
           <View style={{ flex: 1, gap: 8 }}>
@@ -232,7 +234,7 @@ export default function BookFormScreen() {
 
 function confirmDuplicate(title: string): Promise<boolean> {
   return new Promise((resolve) =>
-    Alert.alert('Already on your shelves', `“${title}” has the same ISBN. Add another copy?`, [
+    alert('Already on your shelves', `“${title}” has the same ISBN. Add another copy?`, [
       { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
       { text: 'Add anyway', onPress: () => resolve(true) },
     ]),

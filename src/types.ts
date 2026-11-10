@@ -25,6 +25,11 @@ export interface BookDraft {
   heightMm: number | null;
   /** Overrides the generated spine colour when set. */
   spineColor: string | null;
+  /**
+   * Main cover colour, plus a second one if the cover has one; used for the spine.
+   * null = not worked out yet, [] = the cover gave nothing usable.
+   */
+  coverPalette: string[] | null;
   source: 'openlibrary' | 'googlebooks' | 'goodreads' | 'manual' | 'sample';
 }
 
@@ -58,10 +63,16 @@ export function emptyDraft(): BookDraft {
     coverUrl: null,
     heightMm: null,
     spineColor: null,
+    coverPalette: null,
     source: 'manual',
   };
 }
 
 export function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** What counts as the same book when importing: the ISBN, else title and first author. */
+export function bookKey(b: { isbn13: string | null; title: string; authors: string[] }): string {
+  return b.isbn13 ?? `${b.title}|${b.authors[0]}`.toLowerCase();
 }

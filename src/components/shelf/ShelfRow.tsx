@@ -1,9 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback } from 'react';
-import { FlatList, StyleSheet, Text, View, type ListRenderItem } from 'react-native';
+import { FlatList, Platform, StyleSheet, Text, View, type ListRenderItem } from 'react-native';
 
 import { Shelf, Wood } from '@/constants/theme';
-import type { ShelfItem, ShelfRow as Row } from '@/shelf/layout';
+import { LABEL_MAX_WIDTH, type ShelfItem, type ShelfRow as Row } from '@/shelf/layout';
 import type { Book } from '@/types';
 
 import { BookStack } from './BookStack';
@@ -27,6 +27,8 @@ function ShelfRowComponent({ row, scrollable, onOpen, onLongPress }: Props) {
         <Spine book={item.book} style={item.style} onOpen={onOpen} onLongPress={onLongPress} />
       ) : item.kind === 'stack' ? (
         <BookStack item={item} onOpen={onOpen} onLongPress={onLongPress} />
+      ) : item.kind === 'space' ? (
+        <View style={{ width: item.width }} />
       ) : (
         <Bookend width={item.width} />
       ),
@@ -44,7 +46,9 @@ function ShelfRowComponent({ row, scrollable, onOpen, onLongPress }: Props) {
         data={row.items}
         keyExtractor={(it) => it.key}
         renderItem={renderItem}
-        scrollEnabled={scrollable}
+        // On web a disabled ScrollView gets `touch-action: none`, which also blocks swiping the bookcase up and down from
+        // this shelf. A shelf that fits has nothing to scroll sideways anyway, so leave it enabled there.
+        scrollEnabled={scrollable || Platform.OS === 'web'}
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
         initialNumToRender={24}
@@ -60,7 +64,7 @@ function ShelfRowComponent({ row, scrollable, onOpen, onLongPress }: Props) {
           {row.labels.map((l, i) => {
             const next = row.labels[i + 1]?.x ?? Infinity;
             return (
-              <View key={l.groupKey} style={[styles.plateSlot, { left: CONTENT_INSET + l.x, maxWidth: Math.min(next - l.x - 6, 260) }]}>
+              <View key={l.groupKey} style={[styles.plateSlot, { left: CONTENT_INSET + l.x, maxWidth: Math.min(next - l.x - 6, LABEL_MAX_WIDTH) }]}>
                 <LinearGradient colors={Wood.brass} style={styles.plate}>
                   <Text numberOfLines={1} style={styles.plateText}>
                     {l.label}

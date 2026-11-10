@@ -1,7 +1,8 @@
 import * as Haptics from 'expo-haptics';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alert } from '@/components/alert';
 import { Colors } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
 import { STATUS_LABELS, type Book, type ReadStatus } from '@/types';
@@ -22,7 +23,7 @@ export function QuickActions({ book, onClose, onOpen }: Props) {
   const insets = useSafeAreaInsets();
 
   const confirmRemove = (b: Book) =>
-    Alert.alert('Remove book?', `“${b.title}” will be taken off your shelves.`, [
+    alert('Remove book?', `“${b.title}” will be taken off your shelves.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',

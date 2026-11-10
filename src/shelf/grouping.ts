@@ -14,6 +14,8 @@ export interface ShelfGroup {
   key: string;
   label: string;
   books: Book[];
+  /** Set on groups that can be combined with their neighbours into ranges: a letter ("A–D") or a decade ("1960s–1980s"). */
+  span?: string;
 }
 
 /** Authors with at least this many books get a shelf of their own. */
@@ -99,7 +101,13 @@ function byAuthor(books: Book[]): ShelfGroup[] {
     }
   }
   for (const [letter, list] of bucket(loose, (b) => initialOf(authorSurname(primaryAuthor(b))))) {
-    groups.push({ key: `author-letter:${letter}`, label: letter, books: list.sort(compareShelfOrder), sortKey: letter === '#' ? '￿' : letter });
+    groups.push({
+      key: `author-letter:${letter}`,
+      label: letter,
+      books: list.sort(compareShelfOrder),
+      sortKey: letter === '#' ? '￿' : letter,
+      span: letter === '#' ? undefined : letter,
+    });
   }
   return groups.sort((a, b) => cmp(a.sortKey, b.sortKey)).map(({ sortKey: _, ...g }) => g);
 }
@@ -108,7 +116,12 @@ function byTitle(books: Book[]): ShelfGroup[] {
   const groups = bucket(books, (b) => initialOf(sortableTitle(b.title)));
   return [...groups.entries()]
     .sort(([a], [b]) => (a === '#' ? 1 : b === '#' ? -1 : cmp(a, b)))
-    .map(([letter, list]) => ({ key: `title:${letter}`, label: letter, books: list.sort(compareTitle) }));
+    .map(([letter, list]) => ({
+      key: `title:${letter}`,
+      label: letter,
+      books: list.sort(compareTitle),
+      span: letter === '#' ? undefined : letter,
+    }));
 }
 
 function byPublished(books: Book[]): ShelfGroup[] {
@@ -118,6 +131,7 @@ function byPublished(books: Book[]): ShelfGroup[] {
     .map(([decade, list]) => ({
       key: `published:${decade}`,
       label: decade === 'unknown' ? 'Unknown date' : `${decade}s`,
+      span: decade === 'unknown' ? undefined : `${decade}s`,
       books: list.sort((a, b) => (b.publishedYear ?? 0) - (a.publishedYear ?? 0) || compareShelfOrder(a, b)),
     }));
 }
@@ -125,7 +139,12 @@ function byPublished(books: Book[]): ShelfGroup[] {
 function byRecent(books: Book[]): ShelfGroup[] {
   const reading = books.filter((b) => b.status === 'reading');
   const finished = books.filter((b) => b.dateFinished && b.status !== 'reading');
-  const rest = books.filter((b) => !b.dateFinished && b.status !== 'reading');
+  const undated = books.filter((b) => !b.dateFinished && b.status !== 'reading');
+  // Read with no finish date (common in Goodreads imports, where "Date Read" is often blank) is still read.
+  const readUndated = undated.filter((b) => b.status === 'read');
+  const dnfUndated = undated.filter((b) => b.status === 'dnf');
+  const unread = undated.filter((b) => b.status === 'owned' || b.status === 'want');
+  const newestAdded = (a: Book, b: Book) => cmp(b.dateAdded, a.dateAdded);
 
   const groups: ShelfGroup[] = [];
   if (reading.length) {
@@ -135,6 +154,8 @@ function byRecent(books: Book[]): ShelfGroup[] {
       books: reading.sort((a, b) => cmp(b.dateStarted ?? '', a.dateStarted ?? '')),
     });
   }
+  // Read books with no finish date start the read section, by author, ahead of the dated months.
+  if (readUndated.length) groups.push({ key: 'recent:read-undated', label: 'Read', books: readUndated.sort(compareShelfOrder) });
   const months = bucket(finished, (b) => b.dateFinished!.slice(0, 7));
   for (const month of [...months.keys()].sort().reverse()) {
     const [y, m] = month.split('-').map(Number);
@@ -144,10 +165,66 @@ function byRecent(books: Book[]): ShelfGroup[] {
       books: months.get(month)!.sort((a, b) => cmp(b.dateFinished!, a.dateFinished!)),
     });
   }
-  if (rest.length) {
-    groups.push({ key: 'recent:unread', label: 'Not yet read', books: rest.sort((a, b) => cmp(b.dateAdded, a.dateAdded)) });
-  }
+  if (dnfUndated.length) groups.push({ key: 'recent:dnf', label: 'Did not finish', books: dnfUndated.sort(newestAdded) });
+  if (unread.length) groups.push({ key: 'recent:unread', label: 'Not yet read', books: unread.sort(newestAdded) });
   return groups;
+}
+
+/** Split a run of combinable groups into `parts` consecutive pieces of as equal a width as possible. */
+function splitEvenly(run: ShelfGroup[], widths: number[], parts: number): ShelfGroup[][] {
+  const ideal = widths.reduce((a, b) => a + b, 0) / parts;
+  const pieces: ShelfGroup[][] = [];
+  let piece: ShelfGroup[] = [];
+  let width = 0;
+  run.forEach((group, i) => {
+    // Close the piece when this group would take it further from the ideal than stopping here.
+    const closer = Math.abs(width + widths[i] - ideal) <= Math.abs(width - ideal);
+    if (piece.length && !closer && pieces.length < parts - 1) {
+      pieces.push(piece);
+      piece = [];
+      width = 0;
+    }
+    piece.push(group);
+    width += widths[i];
+  });
+  if (piece.length) pieces.push(piece);
+  return pieces;
+}
+
+function rangeGroup(piece: ShelfGroup[]): ShelfGroup {
+  const [first] = piece;
+  const last = piece[piece.length - 1];
+  if (piece.length === 1) return first;
+  // Label low to high whichever way the shelves run (decades are newest first): "A–D", "1960s–1980s".
+  const [low, high] = [first.span!, last.span!].sort(cmp);
+  return { key: `${first.key}–${last.span}`, label: `${low}–${high}`, books: piece.flatMap((g) => g.books) };
+}
+
+/**
+ * Combines neighbouring letter or decade groups into ranges ("A–D", "1960s–1980s", …) of about `target` width
+ * each, so a shelf holds roughly a screen of books. Groups are never split, so a range runs on to the end of its
+ * last letter or decade. Other groups (an author's own shelf, "#", "Unknown date") stay as they are and break the runs.
+ */
+export function combineRanges(groups: ShelfGroup[], target: number, widthOf: (group: ShelfGroup) => number): ShelfGroup[] {
+  const out: ShelfGroup[] = [];
+  let run: ShelfGroup[] = [];
+  const flush = () => {
+    if (!run.length) return;
+    const widths = run.map(widthOf);
+    const parts = Math.max(1, Math.round(widths.reduce((a, b) => a + b, 0) / target));
+    out.push(...splitEvenly(run, widths, parts).map(rangeGroup));
+    run = [];
+  };
+  for (const group of groups) {
+    if (group.span) {
+      run.push(group);
+    } else {
+      flush();
+      out.push(group);
+    }
+  }
+  flush();
+  return out;
 }
 
 export function groupBooks(books: Book[], mode: SortMode): ShelfGroup[] {

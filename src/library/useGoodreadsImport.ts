@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useLibrary } from '@/library/LibraryProvider';
 import { looksLikeGoodreadsExport, parseGoodreadsCsv } from '@/services/import/goodreadsCsv';
 import { enrichDraft } from '@/services/metadata/lookup';
-import type { Book, BookDraft, NewBook } from '@/types';
+import { bookKey, type Book, type BookDraft, type NewBook } from '@/types';
 
 export type ImportPhase =
   | { kind: 'idle' }
@@ -26,9 +26,6 @@ function enrichmentPatch(before: Book, after: BookDraft): Partial<NewBook> {
   return patch;
 }
 
-const identity = (b: { isbn13: string | null; title: string; authors: string[] }) =>
-  b.isbn13 ?? `${b.title}|${b.authors[0]}`.toLowerCase();
-
 /** Import a Goodreads CSV export, then fill in covers, genres and sizes in the background. */
 export function useGoodreadsImport() {
   const { books, addBooks, updateBook } = useLibrary();
@@ -42,8 +39,8 @@ export function useGoodreadsImport() {
         return;
       }
       const { books: parsed } = parseGoodreadsCsv(csv);
-      const known = new Set(books.map(identity));
-      const fresh = parsed.filter((b) => !known.has(identity(b)));
+      const known = new Set(books.map(bookKey));
+      const fresh = parsed.filter((b) => !known.has(bookKey(b)));
       const duplicates = parsed.length - fresh.length;
       const saved = await addBooks(fresh);
 

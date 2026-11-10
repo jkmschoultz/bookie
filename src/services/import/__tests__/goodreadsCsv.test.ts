@@ -10,6 +10,11 @@ const CSV = `﻿Book Id,Title,Author,Author l-f,Additional Authors,ISBN,ISBN13,M
 describe('parseGoodreadsCsv', () => {
   const { books, skipped } = parseGoodreadsCsv(CSV);
 
+  it('reads the export when it was copied off a web page', () => {
+    const pasted = '\n  ' + CSV.replace(/^\ufeff/, '').replace(/\n/g, '\r\n');
+    expect(parseGoodreadsCsv(pasted).books.map((b) => b.title)).toEqual(books.map((b) => b.title));
+  });
+
   it('parses every row with a title', () => {
     expect(books).toHaveLength(3);
     expect(skipped).toBe(1);

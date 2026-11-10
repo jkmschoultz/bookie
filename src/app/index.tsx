@@ -10,6 +10,7 @@ import { SortBar } from '@/components/SortBar';
 import { Bookcase } from '@/components/shelf/Bookcase';
 import { Colors, Fonts } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
+import { hasSeenOnboarding } from '@/library/onboarding';
 import { sampleBooks } from '@/library/sampleBooks';
 import { useUi } from '@/store/uiStore';
 import type { Book } from '@/types';
@@ -21,7 +22,11 @@ export default function BookshelfScreen() {
   const [actionBook, setActionBook] = useState<Book | null>(null);
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
+    if (!loaded) return;
+    SplashScreen.hideAsync();
+    hasSeenOnboarding().then((seen) => {
+      if (!seen) router.push('/welcome');
+    });
   }, [loaded]);
 
   const visible = useMemo(
