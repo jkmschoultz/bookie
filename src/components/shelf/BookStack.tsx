@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Fonts } from '@/constants/theme';
 import { hashUnit } from '@/shelf/hash';
 import { STACK_JITTER, type StackItem } from '@/shelf/layout';
+import { UNOWNED_OPACITY } from '@/shelf/spineStyle';
 import { LINE_HEIGHT } from '@/shelf/spineText';
 import type { Book } from '@/types';
 
@@ -31,7 +32,7 @@ function BookStackComponent({ item, onOpen, onLongPress }: Props) {
             onLongPress={() => onLongPress(book)}
             accessibilityRole="button"
             accessibilityLabel={`${book.title} by ${book.authors.join(', ')}`}
-            style={{ width: s.height, height: s.width, marginLeft: STACK_JITTER / 2 + offset }}>
+            style={{ width: s.height, height: s.width, marginLeft: STACK_JITTER / 2 + offset, opacity: book.owned ? 1 : UNOWNED_OPACITY }}>
             <View style={[styles.book, { backgroundColor: s.color }]}>
               <LinearGradient colors={SHADING} style={StyleSheet.absoluteFill} />
               {/* Same fitted lines as the upright spine: a book on its side has the same spine. */}

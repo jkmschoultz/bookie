@@ -95,6 +95,9 @@ export default function BookFormScreen() {
   const base = editing ?? draft ?? emptyDraft();
   const [form, setForm] = useState<Form>(() => toForm(base));
   const [status, setStatus] = useState<ReadStatus>('owned');
+  // Whether you own it follows the status ("Want to read" starts as not owned) until you choose either way.
+  const [ownedChoice, setOwnedChoice] = useState<boolean | null>(null);
+  const owned = ownedChoice ?? status !== 'want';
 
   const set = <K extends keyof Form>(key: K) => (value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -103,7 +106,7 @@ export default function BookFormScreen() {
     id: editing?.id ?? -1,
     status,
     rating: null,
-    owned: true,
+    owned,
     dateAdded: today(),
     dateStarted: null,
     dateFinished: null,
@@ -133,7 +136,7 @@ export default function BookFormScreen() {
       source: book.source,
       status,
       rating: null,
-      owned: status !== 'want',
+      owned,
       dateAdded: today(),
       dateStarted: status === 'reading' ? today() : null,
       dateFinished: status === 'read' ? today() : null,
@@ -221,6 +224,12 @@ export default function BookFormScreen() {
                 <Chip key={s} label={STATUS_LABELS[s]} selected={status === s} onPress={() => setStatus(s)} />
               ))}
             </View>
+            <Text style={styles.label}>Do you own it?</Text>
+            <View style={styles.wrap}>
+              <Chip label="On my shelf" selected={owned} onPress={() => setOwnedChoice(true)} />
+              <Chip label="Not owned" selected={!owned} onPress={() => setOwnedChoice(false)} />
+            </View>
+            <Text style={styles.hint}>Books you don’t own are shown faded on the shelf.</Text>
           </>
         )}
 

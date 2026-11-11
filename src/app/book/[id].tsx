@@ -10,6 +10,7 @@ import { Cover } from '@/components/Cover';
 import { StarRating } from '@/components/StarRating';
 import { Colors, Fonts } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
+import { useChangeStatus } from '@/library/useChangeStatus';
 import { STATUS_LABELS, type Book, type ReadStatus } from '@/types';
 
 const STATUSES: ReadStatus[] = ['reading', 'read', 'owned', 'want', 'dnf'];
@@ -32,7 +33,8 @@ export default function BookScreen() {
 
 function BookDetails({ book }: { book: Book }) {
   const insets = useSafeAreaInsets();
-  const { updateBook, setStatus, removeBook } = useLibrary();
+  const { updateBook, removeBook } = useLibrary();
+  const changeStatus = useChangeStatus();
 
   const meta = [
     book.pageCount && `${book.pageCount} pages`,
@@ -94,8 +96,15 @@ function BookDetails({ book }: { book: Book }) {
         <Section title="Status">
           <View style={styles.wrap}>
             {STATUSES.map((s) => (
-              <Chip key={s} label={STATUS_LABELS[s]} selected={book.status === s} onPress={() => setStatus(book.id, s)} />
+              <Chip key={s} label={STATUS_LABELS[s]} selected={book.status === s} onPress={() => changeStatus(book, s)} />
             ))}
+          </View>
+        </Section>
+
+        <Section title="Ownership">
+          <View style={styles.wrap}>
+            <Chip label="On my shelf" selected={book.owned} onPress={() => updateBook(book.id, { owned: true })} />
+            <Chip label="Not owned" selected={!book.owned} onPress={() => updateBook(book.id, { owned: false })} />
           </View>
         </Section>
 
@@ -114,10 +123,6 @@ function BookDetails({ book }: { book: Book }) {
         <Section title="Notes">
           <NotesField value={book.notes} onSave={(notes) => updateBook(book.id, { notes })} />
         </Section>
-
-        <View style={styles.wrap}>
-          <Chip label={book.owned ? 'On my shelf' : 'Not owned'} selected={book.owned} onPress={() => updateBook(book.id, { owned: !book.owned })} />
-        </View>
 
         <Pressable onPress={remove} style={styles.remove}>
           <Text style={styles.removeText}>Remove from library</Text>

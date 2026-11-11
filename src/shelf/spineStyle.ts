@@ -24,6 +24,9 @@ const PALETTE = [
   '#4d6d73', '#7d5a3c', '#a07850', '#264653', '#9b2226', '#bb3e03',
 ];
 
+/** Books you don't own are drawn this faded, whatever their status, standing up or lying flat. */
+export const UNOWNED_OPACITY = 0.5;
+
 export type SpineDecoration = 'plain' | 'bands' | 'band' | 'label' | 'frame';
 const DECORATIONS: SpineDecoration[] = ['plain', 'bands', 'band', 'label', 'frame', 'bands'];
 /** Styles that show off a second cover colour: a thick band, thin top and bottom bands, or an inset frame. */
