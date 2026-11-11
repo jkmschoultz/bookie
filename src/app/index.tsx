@@ -12,13 +12,14 @@ import { Colors, Fonts } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
 import { hasSeenOnboarding } from '@/library/onboarding';
 import { sampleBooks } from '@/library/sampleBooks';
+import { filterBooks } from '@/shelf/filter';
 import { useUi } from '@/store/uiStore';
 import type { Book } from '@/types';
 
 export default function BookshelfScreen() {
   const insets = useSafeAreaInsets();
   const { books, loaded, addBooks } = useLibrary();
-  const { sortMode, layoutMode, statusFilter } = useUi();
+  const { sortMode, layoutMode, statusFilter, ownedFilter } = useUi();
   const [actionBook, setActionBook] = useState<Book | null>(null);
 
   useEffect(() => {
@@ -30,8 +31,8 @@ export default function BookshelfScreen() {
   }, [loaded]);
 
   const visible = useMemo(
-    () => (statusFilter.length ? books.filter((b) => statusFilter.includes(b.status)) : books),
-    [books, statusFilter],
+    () => filterBooks(books, { statuses: statusFilter, owned: ownedFilter }),
+    [books, statusFilter, ownedFilter],
   );
 
   const openBook = useCallback((book: Book) => {
