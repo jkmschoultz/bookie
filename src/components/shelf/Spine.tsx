@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Colors, Fonts } from '@/constants/theme';
-import { DECORATION, type SpineStyle } from '@/shelf/spineStyle';
+import { DECORATION, UNOWNED_OPACITY, type SpineStyle } from '@/shelf/spineStyle';
 import { LINE_HEIGHT } from '@/shelf/spineText';
 import type { Book } from '@/types';
 
@@ -57,7 +57,6 @@ function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
   const { text } = s;
   // The text runs between its insets, which differ per decoration (e.g. more room below a band at the top).
   const textLength = s.height - text.start - text.end;
-  const faded = book.status === 'want' && !book.owned;
 
   const open = () => {
     lift.value = withTiming(1, { duration: 140 });
@@ -75,7 +74,7 @@ function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
       onPressOut={() => (lift.value = withTiming(0, { duration: 160 }))}
       accessibilityRole="button"
       accessibilityLabel={`${book.title} by ${book.authors.join(', ')}`}>
-      <Animated.View style={[{ width: s.width, height: s.height, opacity: faded ? 0.5 : 1 }, animated]}>
+      <Animated.View style={[{ width: s.width, height: s.height, opacity: book.owned ? 1 : UNOWNED_OPACITY }, animated]}>
         <View style={[styles.spine, { backgroundColor: s.color }]}>
           <Decoration s={s} />
           <LinearGradient

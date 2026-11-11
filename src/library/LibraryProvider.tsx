@@ -4,9 +4,10 @@ import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, 
 import { Platform } from 'react-native';
 
 import * as repo from '@/db/books';
-import { today, type Book, type NewBook, type ReadStatus } from '@/types';
+import type { Book, NewBook, ReadStatus } from '@/types';
 
 import type { DuplicateMerge } from './duplicates';
+import { statusPatch } from './status';
 import { useCoverPalettes } from './useCoverPalettes';
 
 interface Library {
@@ -26,18 +27,6 @@ interface Library {
 }
 
 const LibraryContext = createContext<Library | null>(null);
-
-/** Date bookkeeping when a book changes status (e.g. finishing sets dateFinished). */
-export function statusPatch(book: Book, status: ReadStatus): Partial<NewBook> {
-  const patch: Partial<NewBook> = { status };
-  if (status === 'reading' && !book.dateStarted) patch.dateStarted = today();
-  if (status === 'read') {
-    patch.dateFinished = book.dateFinished ?? today();
-    patch.owned = book.owned || book.status !== 'want';
-  }
-  if (status === 'reading' || status === 'want' || status === 'owned') patch.dateFinished = null;
-  return patch;
-}
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();

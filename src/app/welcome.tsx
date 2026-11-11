@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OwnershipExample } from '@/components/OwnershipExample';
 import { Colors, Fonts } from '@/constants/theme';
 import { markOnboardingSeen } from '@/library/onboarding';
 
@@ -11,6 +12,8 @@ interface Step {
   icon: string;
   title: string;
   points: string[];
+  /** Shown under the points. */
+  visual?: ReactNode;
 }
 
 const STEPS: Step[] = [
@@ -19,8 +22,8 @@ const STEPS: Step[] = [
     title: 'Welcome to Bookie',
     points: [
       'Your books, on a virtual bookshelf.',
-      'Swipe left and right along a shelf, and up and down the bookcase.',
-      'Spines are sized by page count and the book’s real height.',
+      'Swipe left and right to browse along a shelf, and up and down across the bookcase.',
+      'Book sizes represent the real size of the books.',
     ],
   },
   {
@@ -37,9 +40,18 @@ const STEPS: Step[] = [
     title: 'Arrange and track',
     points: [
       'Sort shelves by genre, author, title, publish date or what you read recently.',
-      'Filter by Reading, Read, Unread, Want to read or Did not finish.',
+      'Filter by reading progress: Reading, Read, Unread, Want to read or Did not finish.',
       'Tap a book for its details, rating and notes. Press and hold one to change its status quickly.',
     ],
+  },
+  {
+    icon: '📖',
+    title: 'Books you own, and books you don’t',
+    points: [
+      'A book on your shelf looks solid. One you don’t own, such as a book you want or one you’ve borrowed, is faded.',
+      'Choose which when you add a book. You’ll be asked again when you start a book you wanted, and you can switch it any time from its page or by pressing and holding it.',
+    ],
+    visual: <OwnershipExample />,
   },
   {
     icon: '🔒',
@@ -51,10 +63,27 @@ const STEPS: Step[] = [
   },
 ];
 
+/** How far a swipe must travel sideways to turn the page, in px. */
+const SWIPE_DISTANCE = 50;
+
+// On web, let the browser keep vertical scrolling while sideways drags are ours (and don't select text mid-swipe).
+const webSwipeStyle = (Platform.OS === 'web' ? { touchAction: 'pan-y', userSelect: 'none' } : null) as unknown as ViewStyle;
+
 /** First-launch walkthrough. Also reachable from Settings. */
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
+  // Swipe left for the next step and right for the previous one. Only mostly-sideways drags count, so scrolling a
+  // tall step still works. Swiping never finishes the tour: that stays a deliberate tap on the last step.
+  const [swipe] = useState(() =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderRelease: (_, g) => {
+        const turn = g.dx <= -SWIPE_DISTANCE ? 1 : g.dx >= SWIPE_DISTANCE ? -1 : 0;
+        if (turn) setIndex((i) => Math.min(STEPS.length - 1, Math.max(0, i + turn)));
+      },
+    }),
+  );
   const step = STEPS[index];
   const last = index === STEPS.length - 1;
 
@@ -74,28 +103,37 @@ export default function WelcomeScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <Animated.View key={index} entering={FadeIn.duration(220)} style={styles.step}>
-          <Text style={styles.icon}>{step.icon}</Text>
-          <Text style={styles.title}>{step.title}</Text>
-          {step.points.map((p) => (
-            <View key={p} style={styles.point}>
-              <Text style={styles.bullet}>•</Text>
-              <Text style={styles.pointText}>{p}</Text>
-            </View>
-          ))}
+      <View style={[styles.swipeArea, webSwipeStyle]} {...swipe.panHandlers}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Animated.View key={index} entering={FadeIn.duration(220)} style={styles.step}>
+            <Text style={styles.icon}>{step.icon}</Text>
+            <Text style={styles.title}>{step.title}</Text>
+            {step.points.map((p) => (
+              <View key={p} style={styles.point}>
+                <Text style={styles.bullet}>•</Text>
+                <Text style={styles.pointText}>{p}</Text>
+              </View>
+            ))}
 
-          {last && (
-            <View style={styles.devNote}>
-              <Text style={styles.devTitle}>🚧 Still in development</Text>
-              <Text style={styles.devBody}>
-                Bookie is an early prototype. Things may change, and you may run into bugs or rough edges along the way. Thanks for
-                trying it out, and do share anything that breaks or feels off.
-              </Text>
-            </View>
-          )}
-        </Animated.View>
-      </ScrollView>
+            {step.visual}
+
+            {last && (
+              <View style={styles.devNote}>
+                <Text style={styles.devTitle}>🚧 Still in development</Text>
+                <Text style={styles.devBody}>
+                  Bookie is an early prototype. Things may change, and you may run into bugs or rough edges along the way. Thanks for
+                  trying it out, and do share anything that breaks or feels off.
+                </Text>
+              </View>
+            )}
+          </Animated.View>
+        </ScrollView>
+      </View>
+
+      {/* Fixed height, so the page doesn't shift when the hint goes away after the first step. */}
+      <View style={styles.hintRow}>
+        {index === 0 && <Text style={styles.hint}>Swipe left or right to move through, or use the buttons</Text>}
+      </View>
 
       <View style={styles.dots} accessibilityLabel={`Step ${index + 1} of ${STEPS.length}`}>
         {STEPS.map((s, i) => (
@@ -119,6 +157,9 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background, paddingHorizontal: 24 },
   topBar: { height: 24, alignItems: 'flex-end' },
+  swipeArea: { flex: 1 },
+  hintRow: { height: 28, justifyContent: 'center', alignItems: 'center' },
+  hint: { color: Colors.textMuted, fontSize: 13 },
   skip: { color: Colors.textMuted, fontSize: 15, fontWeight: '600' },
   content: { flexGrow: 1, justifyContent: 'center', paddingVertical: 24 },
   step: { gap: 14, maxWidth: 480, width: '100%', alignSelf: 'center' },

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alert } from '@/components/alert';
 import { Colors } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
+import { useChangeStatus } from '@/library/useChangeStatus';
 import { STATUS_LABELS, type Book, type ReadStatus } from '@/types';
 
 import { Chip } from './Chip';
@@ -19,7 +20,8 @@ const STATUSES: ReadStatus[] = ['reading', 'read', 'owned', 'want', 'dnf'];
 
 /** Long-press sheet: change status or remove without leaving the shelf. */
 export function QuickActions({ book, onClose, onOpen }: Props) {
-  const { setStatus, removeBook } = useLibrary();
+  const { updateBook, removeBook } = useLibrary();
+  const changeStatus = useChangeStatus();
   const insets = useSafeAreaInsets();
 
   const confirmRemove = (b: Book) =>
@@ -50,13 +52,33 @@ export function QuickActions({ book, onClose, onOpen }: Props) {
                 key={s}
                 label={STATUS_LABELS[s]}
                 selected={book.status === s}
-                onPress={async () => {
+                onPress={() => {
                   Haptics.selectionAsync();
-                  await setStatus(book.id, s);
-                  onClose();
+                  // Stays open if it asks whether you own the book now, since an alert can't open over a closing sheet.
+                  changeStatus(book, s, onClose);
                 }}
               />
             ))}
+          </View>
+          <View style={styles.statuses}>
+            <Chip
+              label="On my shelf"
+              selected={book.owned}
+              onPress={() => {
+                Haptics.selectionAsync();
+                updateBook(book.id, { owned: true });
+                onClose();
+              }}
+            />
+            <Chip
+              label="Not owned"
+              selected={!book.owned}
+              onPress={() => {
+                Haptics.selectionAsync();
+                updateBook(book.id, { owned: false });
+                onClose();
+              }}
+            />
           </View>
           <View style={styles.actions}>
             <Pressable
@@ -88,7 +110,7 @@ const styles = StyleSheet.create({
   },
   title: { color: Colors.text, fontSize: 20, fontWeight: '700' },
   author: { color: Colors.textMuted, fontSize: 15, marginBottom: 12 },
-  statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 2 },
   actions: { flexDirection: 'row', gap: 12, marginTop: 16 },
   action: {
     flex: 1,

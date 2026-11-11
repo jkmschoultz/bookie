@@ -13,6 +13,8 @@ npm test              # unit tests (shelf layout, grouping, metadata, Goodreads 
 npx tsc --noEmit && npx expo lint
 ```
 
+Optional: copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY`. Google Books is a fallback for page counts, genres and book heights, and its keyless quota is often exhausted. Open Library works without a key.
+
 ## Deploy the web app
 
 ```bash
@@ -22,7 +24,23 @@ npm run deploy:web      # expo export --platform web, then eas deploy --prod (EA
 
 The first deploy asks you to log in to Expo and pick a subdomain. `public/` holds the web shell: `index.html` (manifest and iOS home-screen tags), `manifest.json` and the home-screen icons. On web, only use SQLite's async API (`getAllAsync`, `runAsync`, kv-store `getItem`…): the sync calls need `SharedArrayBuffer`, which needs the cross-origin isolation headers in the `expo-router` plugin in `app.json`. `expo start` sends those headers but EAS Hosting doesn't for this static build, so sync calls would work locally and fail on the live site.
 
-Optional: copy `.env.example` to `.env.local` and set `EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY`. Google Books is a fallback for page counts, genres and book heights, and its keyless quota is often exhausted. Open Library works without a key.
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request into `master` (and on pushes to it):
+
+1. **Tests**: the unit tests. Required to merge.
+2. **Build**: the same web export the deploy uses. Required to merge.
+3. **Typecheck & lint**: advisory. A failure shows as a red cross on the PR but doesn't have to block merging.
+4. **Preview deploy**: after Build, deploys that build to an unnamed EAS Hosting address and posts it on the PR. It's a separate, empty library from the live app, and Expo deletes it after 30 days. It doesn't use one of the 5 named aliases.
+
+The four run in parallel.
+
+Merging deploys nothing; run `npm run deploy:web` for that. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
+
+- `EXPO_TOKEN` (needed for previews): create one at expo.dev → Account settings → Access tokens. Without it the preview job just skips.
+- `GOOGLE_BOOKS_API_KEY` (optional): the same value as in `.env.local`, so preview builds match the live app.
+
+To block merging until the right checks pass: Settings → Branches (or Rules → Rulesets) → protect `master` → require a pull request and require the **Tests** and **Build** status checks. Leave **Typecheck & lint** (and **Preview deploy**) off that list to keep them optional. Check names come from each job's `name:` in the workflow, and a check only appears in the list after it has run once.
 
 ## Layout
 
