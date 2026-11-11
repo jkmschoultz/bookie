@@ -1,0 +1,127 @@
+name: CI
+
+# Every pull request into master is typechecked, linted, tested and test-built, then deployed to a throwaway
+# preview address that's posted on the PR. Merging itself deploys nothing: run `npm run deploy:web` for that.
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+# A newer push to the same PR replaces the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx expo lint
+
+      - name: Test
+        run: npx jest --ci
+
+      # Google Books key is optional: without it (or on PRs from
+      # forks, which can't read secrets) the app falls back to Open Library alone.
+      - name: Build web app
+        run: npx expo export --platform web
+        env:
+          EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
+
+      # Handed to the preview job so it deploys exactly what was just tested.
+      - name: Keep the build for the preview
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: dist
+          retention-days: 1
+          if-no-files-found: error
+
+  preview:
+    name: Preview deploy
+    needs: check
+    # Only for PRs from this repo
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check for an Expo token
+        if: env.EXPO_TOKEN == ''
+        run: echo "::notice title=No preview::Add an EXPO_TOKEN repository secret to get a preview deployment on each pull request."
+
+      - uses: actions/checkout@v4
+        if: env.EXPO_TOKEN != ''
+
+      - uses: actions/setup-node@v4
+        if: env.EXPO_TOKEN != ''
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        if: env.EXPO_TOKEN != ''
+
+      - uses: actions/download-artifact@v4
+        if: env.EXPO_TOKEN != ''
+        with:
+          name: web-build
+          path: dist
+
+      # Deploy preview build
+      - name: Deploy preview
+        id: deploy
+        if: env.EXPO_TOKEN != ''
+        run: |
+          npx --yes eas-cli@27.7.1 deploy --json > deploy.json
+          cat deploy.json
+          echo "url=$(jq -r .url deploy.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Post the preview address on the PR
+        if: env.EXPO_TOKEN != ''
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        with:
+          script: |
+            const marker = '<!-- bookie-preview -->';
+            const sha = context.payload.pull_request.head.sha.slice(0, 7);
+            const body = [
+              marker,
+              `**Preview:** ${process.env.PREVIEW_URL}`,
+              '',
+              `Built from ${sha}. It has its own empty library, separate from the live app. Removed automatically after 30 days.`,
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
