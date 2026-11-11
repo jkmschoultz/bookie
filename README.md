@@ -28,15 +28,19 @@ The first deploy asks you to log in to Expo and pick a subdomain. `public/` hold
 
 `.github/workflows/ci.yml` runs on every pull request into `master` (and on pushes to it):
 
-1. **Check** (the required check): typecheck, lint, tests, then the same web export the deploy uses.
-2. **Preview deploy**: deploys that build to an unnamed EAS Hosting address and posts it on the PR. It's a separate, empty library from the live app, and Expo deletes it after 30 days. It doesn't use one of the 5 named aliases.
+1. **Tests**: the unit tests. Required to merge.
+2. **Build**: the same web export the deploy uses. Required to merge.
+3. **Typecheck & lint**: advisory. A failure shows as a red cross on the PR but doesn't have to block merging.
+4. **Preview deploy**: after Build, deploys that build to an unnamed EAS Hosting address and posts it on the PR. It's a separate, empty library from the live app, and Expo deletes it after 30 days. It doesn't use one of the 5 named aliases.
+
+The four run in parallel.
 
 Merging deploys nothing; run `npm run deploy:web` for that. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
 
 - `EXPO_TOKEN` (needed for previews): create one at expo.dev → Account settings → Access tokens. Without it the preview job just skips.
 - `GOOGLE_BOOKS_API_KEY` (optional): the same value as in `.env.local`, so preview builds match the live app.
 
-To require the check before merging: Settings → Branches (or Rules → Rulesets) → protect `master` → require a pull request and the **Check** status check to pass.
+To block merging until the right checks pass: Settings → Branches (or Rules → Rulesets) → protect `master` → require a pull request and require the **Tests** and **Build** status checks. Leave **Typecheck & lint** (and **Preview deploy**) off that list to keep them optional. Check names come from each job's `name:` in the workflow, and a check only appears in the list after it has run once.
 
 ## Layout
 

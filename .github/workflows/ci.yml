@@ -1,7 +1,11 @@
 name: CI
 
-# Every pull request into master is typechecked, linted, tested and test-built, then deployed to a throwaway
+# Every pull request into master is tested, test-built, typechecked and linted, then deployed to a throwaway
 # preview address that's posted on the PR. Merging itself deploys nothing: run `npm run deploy:web` for that.
+#
+# The jobs are separate so they can be treated differently when approving a PR. Tests and Build should be required
+# checks; Typecheck & lint is advisory (it still shows a red cross when it fails, but doesn't have to block).
+# Which checks are required is a setting on GitHub, not in this file: see "Continuous integration" in the README.
 on:
   pull_request:
     branches: [master]
@@ -17,8 +21,56 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: Check
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        run: npx jest --ci
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Google Books key is optional: without it (or on PRs from
+      # forks, which can't read secrets) the app falls back to Open Library alone.
+      - name: Build web app
+        run: npx expo export --platform web
+        env:
+          EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
+
+      # Handed to the preview job so it deploys exactly what was just built.
+      - name: Keep the build for the preview
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: dist
+          retention-days: 1
+          if-no-files-found: error
+
+  typecheck:
+    name: Typecheck & lint
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,32 +86,15 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      # Runs even if the typecheck failed, so one run reports both.
       - name: Lint
+        if: ${{ !cancelled() }}
         run: npx expo lint
-
-      - name: Test
-        run: npx jest --ci
-
-      # Google Books key is optional: without it (or on PRs from
-      # forks, which can't read secrets) the app falls back to Open Library alone.
-      - name: Build web app
-        run: npx expo export --platform web
-        env:
-          EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
-
-      # Handed to the preview job so it deploys exactly what was just tested.
-      - name: Keep the build for the preview
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-build
-          path: dist
-          retention-days: 1
-          if-no-files-found: error
 
   preview:
     name: Preview deploy
-    needs: check
+    # Needs only the build: a preview is still worth having while tests or the typecheck are failing.
+    needs: build
     # Only for PRs from this repo
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
