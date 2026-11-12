@@ -1,8 +1,36 @@
 # Bookie
 
+![Bookie: your books, on a real shelf](docs/cover.png)
+
 A reading tracker that shows your library as a virtual bookshelf. Swipe along shelves and up and down the bookcase. Book thickness follows page count and height follows the book's physical size. Shelves can be grouped by genre, author, title, publish date or recently read.
 
-Built with Expo (SDK 58). Runs in **Expo Go** (once the SDK 58 Expo Go is out on the stores; until then use a development build) and on the **web**. All data stays on the device in SQLite, so use Settings → Export backup to keep a copy.
+**[Try it live → bookie.expo.app](https://bookie.expo.app)** (an early prototype, free, no account)
+
+<p>
+  <img src="docs/bookie-intro.gif" alt="The bookshelf, swiping along a shelf and up the bookcase" width="260">
+  &nbsp;
+  <img src="docs/home.png" alt="The home screen with a sample library" width="260">
+</p>
+
+## What it does
+
+- **Real-size books.** Each spine's thickness comes from the page count and its height from the book's physical size. Colours come from the cover's most common colours, with a second colour when the cover has one.
+- **Swipe around the shelves.** Sideways along a shelf, up and down the bookcase. Shelves group by genre, author, title, publish date or what you read recently, and long groups are split into ranges (A–D, E–G…) about a screen wide.
+- **Track your reading.** Reading, read, unread, want to read, did not finish, with ratings, dates and notes. A book you're reading gets a bookmark.
+- **Own it or not.** Books you don't own are faded. Starting a book you wanted asks whether it's on your shelf now.
+- **Get books in.** Search, barcode scan, type them in, import a Goodreads export, or start with a sample library. Duplicates can be merged.
+- **Keeps your data with you.** Everything is stored on the device in SQLite, with no account and no cloud. Export and restore a backup from Settings.
+- **Works as an app.** Runs on the web and can be added to a phone's home screen, and runs in Expo Go.
+
+## Built with
+
+Expo (SDK 58), React Native and Expo Router, TypeScript, SQLite (`expo-sqlite`), Zustand and Reanimated. The shelf engine in `src/shelf/` is plain TypeScript with unit tests (Jest). Pull requests are checked by GitHub Actions, which also deploys to EAS Hosting.
+
+All data stays on the device in SQLite, so use Settings → Export backup to keep a copy. It runs in **Expo Go** (once the SDK 58 Expo Go is out on the stores; until then use a development build) and on the **web**.
+
+## Licence
+
+Source-available, not open source. Bookie is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE): you're free to read, run, learn from and build on the code for **non-commercial** purposes. You may not use it, or something substantially copied from it, to run a commercial product or service. For anything commercial, get in touch first. Parts that came from Expo's project template stay under their own MIT licence ([LICENSE-EXPO-TEMPLATE](LICENSE-EXPO-TEMPLATE)).
 
 ## Run
 

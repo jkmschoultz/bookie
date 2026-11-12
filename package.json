@@ -60,6 +60,7 @@
     "deploy:staging": "expo export --platform web && npx eas-cli@latest deploy --alias staging"
   },
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "jest": {
     "preset": "jest-expo",
     "testPathIgnorePatterns": [
