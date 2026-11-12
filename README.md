@@ -1,6 +1,6 @@
 # Bookie
 
-A reading tracker that shows your library as a virtual bookshelf. Swipe along shelves and up and down the bookcase. Spine thickness follows page count and spine height follows the book's physical size. Shelves can be grouped by genre, author, title, publish date or recently read.
+A reading tracker that shows your library as a virtual bookshelf. Swipe along shelves and up and down the bookcase. Book thickness follows page count and height follows the book's physical size. Shelves can be grouped by genre, author, title, publish date or recently read.
 
 Built with Expo (SDK 58). Runs in **Expo Go** (once the SDK 58 Expo Go is out on the stores; until then use a development build) and on the **web**. All data stays on the device in SQLite, so use Settings → Export backup to keep a copy.
 
@@ -33,11 +33,11 @@ The first deploy asks you to log in to Expo and pick a subdomain. `public/` hold
 3. **Typecheck & lint**: advisory. A failure shows as a red cross on the PR but doesn't have to block merging.
 4. **Preview deploy**: after Build, deploys that build to an unnamed EAS Hosting address and posts it on the PR. It's a separate, empty library from the live app, and Expo deletes it after 30 days. It doesn't use one of the 5 named aliases.
 
-The four run in parallel.
+5. **Deploy to production**: only on pushes to `master` (a merged PR or a direct push). Waits for Tests and Build, then deploys that build with `eas deploy --prod`. Typecheck & lint doesn't hold it up.
 
-Merging deploys nothing; run `npm run deploy:web` for that. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
+On a PR, the first four run in parallel. `npm run deploy:web` still works for deploying by hand. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
 
-- `EXPO_TOKEN` (needed for previews): create one at expo.dev → Account settings → Access tokens. Without it the preview job just skips.
+- `EXPO_TOKEN` (needed for previews and the production deploy): create one at expo.dev → Account settings → Access tokens. Without it those jobs just skip.
 - `GOOGLE_BOOKS_API_KEY` (optional): the same value as in `.env.local`, so preview builds match the live app.
 
 To block merging until the right checks pass: Settings → Branches (or Rules → Rulesets) → protect `master` → require a pull request and require the **Tests** and **Build** status checks. Leave **Typecheck & lint** (and **Preview deploy**) off that list to keep them optional. Check names come from each job's `name:` in the workflow, and a check only appears in the list after it has run once.

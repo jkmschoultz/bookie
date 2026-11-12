@@ -66,7 +66,7 @@ function BookDetails({ book }: { book: Book }) {
           ),
         }}
       />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
         <Animated.View entering={ZoomIn.springify().damping(16)} style={styles.coverWrap}>
           <Cover book={book} width={170} />
         </Animated.View>
@@ -145,13 +145,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function DateField({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string | null) => void }) {
   const [text, setText] = useState(value ?? '');
   const invalid = text !== '' && !DATE_RE.test(text);
+  const save = () => {
+    const next = text.trim() || null;
+    if (!invalid && next !== value) onChange(next);
+  };
   return (
     <View style={{ flex: 1, gap: 4 }}>
       <Text style={styles.hint}>{label}</Text>
       <TextInput
         value={text}
         onChangeText={setText}
-        onEndEditing={() => !invalid && onChange(text || null)}
+        onBlur={save}
+        onEndEditing={save}
         placeholder="YYYY-MM-DD"
         placeholderTextColor={Colors.border}
         keyboardType="numbers-and-punctuation"
@@ -163,11 +168,13 @@ function DateField({ label, value, onChange }: { label: string; value: string | 
 
 function NotesField({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) {
   const [text, setText] = useState(value ?? '');
+  const save = () => text !== (value ?? '') && onSave(text.trim() || null);
   return (
     <TextInput
       value={text}
       onChangeText={setText}
-      onEndEditing={() => text !== (value ?? '') && onSave(text.trim() || null)}
+      onBlur={save}
+      onEndEditing={save}
       placeholder="Thoughts, quotes, where you bought it…"
       placeholderTextColor={Colors.border}
       multiline
@@ -207,7 +214,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 15,
+    fontSize: 16,
   },
   hint: { color: Colors.textMuted, fontSize: 12 },
   headerAction: { color: Colors.accent, fontSize: 16, fontWeight: '600' },

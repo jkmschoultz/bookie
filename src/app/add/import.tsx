@@ -18,6 +18,7 @@ export default function ImportScreen() {
   const busy = phase.kind === 'reading' || phase.kind === 'enriching';
   // Shown when the browser won't hand over the clipboard, so the export can be pasted in by hand.
   const [pasteBox, setPasteBox] = useState<string | null>(null);
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
 
   const pickFile = async () => {
     const picked = await DocumentPicker.getDocumentAsync({
@@ -44,20 +45,37 @@ export default function ImportScreen() {
   };
 
   const pasteFromClipboard = async () => {
+    let text = '';
     try {
-      const text = await navigator.clipboard.readText();
-      if (looksLikeGoodreadsExport(text.trimStart())) {
-        await importText(text);
-        return;
-      }
+      text = await navigator.clipboard.readText();
     } catch {
-      // Not allowed or not supported. Either way, and when the clipboard holds something else, paste into a text box.
+      // Not allowed or not supported: paste into a text box instead.
+      setPasteNote('Your browser didn’t hand over the clipboard, so paste it here instead.');
+      setPasteBox('');
+      return;
     }
-    setPasteBox('');
+    if (looksLikeGoodreadsExport(text.trimStart())) {
+      await importText(text);
+      return;
+    }
+    // Keep whatever was read so it can be checked or fixed, rather than silently throwing it away.
+    setPasteNote(
+      text.trim()
+        ? 'The clipboard doesn’t look like a Goodreads export (it should start with “Book Id,Title,Author…”). Copy the whole export page and paste it here.'
+        : 'The clipboard is empty. Copy the export first, then paste it here.',
+    );
+    setPasteBox(text);
+  };
+
+  // Pasting straight into the box imports it, so there's no second button to press.
+  const onPasteBoxChange = (text: string) => {
+    const pasted = pasteBox !== null && text.length - pasteBox.length > 100;
+    setPasteBox(text);
+    if (pasted && looksLikeGoodreadsExport(text.trimStart())) importText(text);
   };
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.heading}>Bring in your Goodreads library</Text>
       {CAN_SIGN_IN ? (
         <Text style={styles.body}>
@@ -99,9 +117,10 @@ export default function ImportScreen() {
                 </Pressable>
               ) : (
                 <>
+                  {pasteNote && <Text style={styles.body}>{pasteNote}</Text>}
                   <TextInput
                     value={pasteBox}
-                    onChangeText={setPasteBox}
+                    onChangeText={onPasteBoxChange}
                     multiline
                     autoFocus
                     placeholder="Tap and hold here, then Paste"
@@ -143,7 +162,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
     color: Colors.text,
-    fontSize: 13,
+    fontSize: 16,
     textAlignVertical: 'top',
   },
 });

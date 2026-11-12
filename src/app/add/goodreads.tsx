@@ -71,7 +71,7 @@ export default function GoodreadsWebImport() {
 
   if (phase.kind === 'enriching' || phase.kind === 'done') {
     return (
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.status}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={styles.status}>
         <ImportStatus phase={phase} />
       </ScrollView>
     );

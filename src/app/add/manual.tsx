@@ -158,7 +158,7 @@ export default function BookFormScreen() {
           ),
         }}
       />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.coverRow}>
           <Cover key={form.coverUrl ?? 'none'} book={preview} width={96} />
           <View style={{ flex: 1, gap: 8 }}>
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 15,
+    fontSize: 16,
   },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   swatch: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },

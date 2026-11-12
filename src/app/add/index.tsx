@@ -14,7 +14,7 @@ const OPTIONS: { href: Href; icon: string; title: string; body: string }[] = [
 export default function AddScreen() {
   const setDraft = useUi((s) => s.setDraft);
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={styles.list}>
       {OPTIONS.map((o) => (
         <Pressable
           key={o.title}

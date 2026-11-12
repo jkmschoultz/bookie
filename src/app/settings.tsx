@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { alert } from '@/components/alert';
+import { SupportNote } from '@/components/SupportNote';
 import { Colors } from '@/constants/theme';
 import { findDuplicates } from '@/library/duplicates';
 import { useLibrary } from '@/library/LibraryProvider';
@@ -93,7 +94,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+    <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={styles.content}>
       <Text style={styles.sectionTitle}>Library</Text>
       <View style={styles.card}>
         <Text style={styles.body}>
@@ -153,6 +154,10 @@ export default function SettingsScreen() {
         Your library only lives on this device. Export a backup now and then, and keep it somewhere safe like Files or Drive.
         Restoring adds the books from a backup and skips any already on your shelves. Photos you took for covers aren’t included.
       </Text>
+
+      <View style={styles.spaced}>
+        <SupportNote />
+      </View>
     </ScrollView>
   );
 }

@@ -1,7 +1,8 @@
 name: CI
 
 # Every pull request into master is tested, test-built, typechecked and linted, then deployed to a throwaway
-# preview address that's posted on the PR. Merging itself deploys nothing: run `npm run deploy:web` for that.
+# preview address that's posted on the PR. Once something lands on master (a merge or a direct push) and the tests
+# and build pass, that same build is deployed to production.
 #
 # The jobs are separate so they can be treated differently when approving a PR. Tests and Build should be required
 # checks; Typecheck & lint is advisory (it still shows a red cross when it fails, but doesn't have to block).
@@ -15,7 +16,8 @@ on:
 # A newer push to the same PR replaces the run in progress.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on master half way through a production deploy.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 permissions:
   contents: read
@@ -59,9 +61,8 @@ jobs:
         env:
           EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
 
-      # Handed to the preview job so it deploys exactly what was just built.
-      - name: Keep the build for the preview
-        if: github.event_name == 'pull_request'
+      # Handed to the preview and deploy jobs so they ship exactly what was just built.
+      - name: Keep the build for deploying
         uses: actions/upload-artifact@v4
         with:
           name: web-build
@@ -160,3 +161,39 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number, body });
             }
+
+  deploy:
+    name: Deploy to production
+    # Only after the tests and the build pass, and only for commits that land on master.
+    needs: [tests, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check for an Expo token
+        if: env.EXPO_TOKEN == ''
+        run: echo "::warning title=Not deployed::Add an EXPO_TOKEN repository secret to deploy to production from GitHub."
+
+      - uses: actions/checkout@v4
+        if: env.EXPO_TOKEN != ''
+
+      - uses: actions/setup-node@v4
+        if: env.EXPO_TOKEN != ''
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        if: env.EXPO_TOKEN != ''
+
+      - uses: actions/download-artifact@v4
+        if: env.EXPO_TOKEN != ''
+        with:
+          name: web-build
+          path: dist
+
+      - name: Deploy to production
+        if: env.EXPO_TOKEN != ''
+        run: npx --yes eas-cli@27.7.1 deploy --prod

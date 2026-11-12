@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StorageErrorBoundary } from '@/components/StorageError';
 import { Colors } from '@/constants/theme';
 import { migrate } from '@/db/migrations';
+import '@/library/installPrompt';
 import { LibraryProvider } from '@/library/LibraryProvider';
 
 SplashScreen.preventAutoHideAsync();
