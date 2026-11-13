@@ -4,6 +4,7 @@ import { FlatList, Platform, StyleSheet, Text, View, type ListRenderItem } from 
 
 import { Shelf, Wood } from '@/constants/theme';
 import { LABEL_MAX_WIDTH, type ShelfItem, type ShelfRow as Row } from '@/shelf/layout';
+import type { SpineRect } from '@/library/bookFlight';
 import type { Book } from '@/types';
 
 import { BookStack } from './BookStack';
@@ -12,7 +13,7 @@ import { Spine } from './Spine';
 interface Props {
   row: Row;
   scrollable: boolean;
-  onOpen: (book: Book) => void;
+  onOpen: (book: Book, from?: SpineRect) => void;
   onLongPress: (book: Book) => void;
 }
 

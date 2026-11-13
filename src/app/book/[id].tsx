@@ -1,16 +1,18 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/components/alert';
 import { Chip } from '@/components/Chip';
+import { COVER_ASPECT } from '@/components/Cover';
 import { CoverEditor, splitAuthors } from '@/components/CoverEditor';
 import { DateInput } from '@/components/DateInput';
 import { StarRating } from '@/components/StarRating';
 import { Colors, Fonts } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
+import { useBookFlight } from '@/library/bookFlight';
 import { checkReadingDates } from '@/library/fields';
 import { useChangeStatus } from '@/library/useChangeStatus';
 import { STATUS_LABELS, today, type Book, type ReadStatus } from '@/types';
@@ -37,6 +39,24 @@ function BookDetails({ book }: { book: Book }) {
   const insets = useSafeAreaInsets();
   const { updateBook, removeBook } = useLibrary();
   const changeStatus = useChangeStatus();
+
+  // A book opened from its shelf flies here (see BookFlight): keep this cover hidden until it lands on it.
+  const landing = useBookFlight((f) => f.flight?.book.id === book.id);
+  const [flewIn] = useState(landing);
+  const land = useBookFlight((f) => f.land);
+  const finishFlight = useBookFlight((f) => f.finish);
+  const coverRef = useRef<ComponentRef<typeof View>>(null);
+  const reportCover = () =>
+    coverRef.current?.measureInWindow((x, y, width) =>
+      land(book.id, { x: x + (width - COVER_WIDTH) / 2, y, width: COVER_WIDTH, height: COVER_WIDTH * COVER_ASPECT }),
+    );
+  // Leaving before it lands (a quick Back) calls the flight off.
+  useEffect(
+    () => () => {
+      if (useBookFlight.getState().flight?.book.id === book.id) finishFlight();
+    },
+    [book.id, finishFlight],
+  );
 
   // Title and author are typed on the cover and saved when a field is left. An empty title goes back to the old one.
   const [title, setTitle] = useState(book.title);
@@ -84,7 +104,11 @@ function BookDetails({ book }: { book: Book }) {
         }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
-        <Animated.View entering={ZoomIn.springify().damping(16)} style={styles.coverWrap}>
+        <Animated.View
+          ref={coverRef}
+          onLayout={reportCover}
+          entering={flewIn ? undefined : ZoomIn.springify().damping(16)}
+          style={[styles.coverWrap, landing && { opacity: 0 }]}>
           <CoverEditor
             book={book}
             width={COVER_WIDTH}

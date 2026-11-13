@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo } from 'react';
+import { memo, useRef, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Colors, Fonts } from '@/constants/theme';
+import { useBookFlight, type Rect, type SpineRect } from '@/library/bookFlight';
 import { DECORATION, UNOWNED_OPACITY, type SpineStyle } from '@/shelf/spineStyle';
 import { LINE_HEIGHT } from '@/shelf/spineText';
 import type { Book } from '@/types';
@@ -11,7 +12,7 @@ import type { Book } from '@/types';
 interface Props {
   book: Book;
   style: SpineStyle;
-  onOpen: (book: Book) => void;
+  onOpen: (book: Book, from?: SpineRect) => void;
   onLongPress: (book: Book) => void;
 }
 
@@ -47,22 +48,75 @@ function Decoration({ s }: { s: SpineStyle }) {
   }
 }
 
+/** How a spine looks: colour, ornaments, shading and its upright title. Also drawn by the book flying to its page. */
+export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle }) {
+  const { text } = s;
+  // The text runs between its insets, which differ per decoration (e.g. more room below a band at the top).
+  const textLength = s.height - text.start - text.end;
+  return (
+    <>
+      <View style={[styles.spine, { backgroundColor: s.color }]}>
+        <Decoration s={s} />
+        <LinearGradient colors={SHADING} locations={SHADING_STOPS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+        {book.status === 'dnf' && <View style={styles.dnf} />}
+        {/* Text is laid out horizontally, then rotated to run top-to-bottom. */}
+        <View
+          style={[
+            styles.textRow,
+            {
+              width: textLength,
+              height: s.width,
+              left: (s.width - textLength) / 2,
+              top: (s.height - s.width) / 2 + (text.start - text.end) / 2,
+            },
+          ]}>
+          {/* Lines are pre-fitted to the spine (shrunk or wrapped), so nothing should be cut off. */}
+          <Text
+            numberOfLines={text.numberOfLines}
+            style={{
+              flexShrink: 1,
+              color: s.textColor,
+              fontSize: text.fontSize,
+              lineHeight: text.fontSize * LINE_HEIGHT,
+              textAlign: text.lines.length > 1 ? 'center' : 'left',
+              fontFamily: s.font === 'serif' ? Fonts.serif : Fonts.sans,
+              fontWeight: s.font === 'sans' ? '700' : '600',
+              letterSpacing: s.uppercase ? 0.8 : 0.2,
+            }}>
+            {text.lines.join('\n')}
+          </Text>
+          {text.author && (
+            <Text numberOfLines={1} style={[styles.author, { color: s.textColor, fontSize: text.authorSize, maxWidth: textLength * 0.4 }]}>
+              {text.author}
+            </Text>
+          )}
+        </View>
+      </View>
+      {book.status === 'reading' && <View style={styles.bookmark} />}
+    </>
+  );
+}
+
 function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
+  const ref = useRef<ComponentRef<typeof View>>(null);
   const lift = useSharedValue(0);
   const animated = useAnimatedStyle(() => ({
     transform: [{ translateY: -14 * lift.value }, { scale: 1 + 0.04 * lift.value }],
     zIndex: lift.value > 0 ? 10 : 0,
   }));
-
-  const { text } = s;
-  // The text runs between its insets, which differ per decoration (e.g. more room below a band at the top).
-  const textLength = s.height - text.start - text.end;
+  // While this book is flying to its page it isn't on the shelf.
+  const away = useBookFlight((f) => f.flight?.book.id === book.id);
 
   const open = () => {
     lift.value = withTiming(1, { duration: 140 });
     setTimeout(() => {
-      onOpen(book);
-      lift.value = withSpring(0, { damping: 14 });
+      const done = (from?: Rect) => {
+        onOpen(book, from && { ...from, style: s });
+        lift.value = withSpring(0, { damping: 14 });
+      };
+      // Where the lifted book is on screen, for the flight to its page to start from.
+      if (ref.current) ref.current.measureInWindow((x, y, width, height) => done({ x, y, width, height }));
+      else done();
     }, 150);
   };
 
@@ -74,51 +128,10 @@ function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
       onPressOut={() => (lift.value = withTiming(0, { duration: 160 }))}
       accessibilityRole="button"
       accessibilityLabel={`${book.title} by ${book.authors.join(', ')}`}>
-      <Animated.View style={[{ width: s.width, height: s.height, opacity: book.owned ? 1 : UNOWNED_OPACITY }, animated]}>
-        <View style={[styles.spine, { backgroundColor: s.color }]}>
-          <Decoration s={s} />
-          <LinearGradient
-            colors={SHADING}
-            locations={SHADING_STOPS}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
-          {book.status === 'dnf' && <View style={styles.dnf} />}
-          {/* Text is laid out horizontally, then rotated to run top-to-bottom. */}
-          <View
-            style={[
-              styles.textRow,
-              {
-                width: textLength,
-                height: s.width,
-                left: (s.width - textLength) / 2,
-                top: (s.height - s.width) / 2 + (text.start - text.end) / 2,
-              },
-            ]}>
-            {/* Lines are pre-fitted to the spine (shrunk or wrapped), so nothing should be cut off. */}
-            <Text
-              numberOfLines={text.numberOfLines}
-              style={{
-                flexShrink: 1,
-                color: s.textColor,
-                fontSize: text.fontSize,
-                lineHeight: text.fontSize * LINE_HEIGHT,
-                textAlign: text.lines.length > 1 ? 'center' : 'left',
-                fontFamily: s.font === 'serif' ? Fonts.serif : Fonts.sans,
-                fontWeight: s.font === 'sans' ? '700' : '600',
-                letterSpacing: s.uppercase ? 0.8 : 0.2,
-              }}>
-              {text.lines.join('\n')}
-            </Text>
-            {text.author && (
-              <Text numberOfLines={1} style={[styles.author, { color: s.textColor, fontSize: text.authorSize, maxWidth: textLength * 0.4 }]}>
-                {text.author}
-              </Text>
-            )}
-          </View>
-        </View>
-        {book.status === 'reading' && <View style={styles.bookmark} />}
+      <Animated.View
+        ref={ref}
+        style={[{ width: s.width, height: s.height, opacity: away ? 0 : book.owned ? 1 : UNOWNED_OPACITY }, animated]}>
+        <SpineFace book={book} style={s} />
       </Animated.View>
     </Pressable>
   );

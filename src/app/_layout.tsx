@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Suspense } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { BookFlight } from '@/components/BookFlight';
 import { StorageErrorBoundary } from '@/components/StorageError';
 import { Colors } from '@/constants/theme';
 import { migrate } from '@/db/migrations';
@@ -49,6 +50,7 @@ export default function RootLayout() {
                   <Stack.Screen name="add/import" options={{ title: 'Import from Goodreads' }} />
                   <Stack.Screen name="add/goodreads" options={{ title: 'Goodreads' }} />
                 </Stack>
+                <BookFlight />
               </LibraryProvider>
             </SQLiteProvider>
           </Suspense>
