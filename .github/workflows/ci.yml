@@ -60,6 +60,9 @@ jobs:
         run: npx expo export --platform web
         env:
           EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
+          # Once Bookie has a new web address, set the BOOKIE_NEW_URL repository variable to it: the old address then
+          # shows a "Bookie has moved" banner that hands each library across. Unset, nothing changes.
+          EXPO_PUBLIC_NEW_URL: ${{ vars.BOOKIE_NEW_URL }}
 
       # Handed to the preview and deploy jobs so they ship exactly what was just built.
       - name: Keep the build for deploying

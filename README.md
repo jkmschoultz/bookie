@@ -52,6 +52,18 @@ npm run deploy:web      # expo export --platform web, then eas deploy --prod (EA
 
 The first deploy asks you to log in to Expo and pick a subdomain. `public/` holds the web shell: `index.html` (manifest and iOS home-screen tags), `manifest.json` and the home-screen icons. On web, only use SQLite's async API (`getAllAsync`, `runAsync`, kv-store `getItem`…): the sync calls need `SharedArrayBuffer`, which needs the cross-origin isolation headers in the `expo-router` plugin in `app.json`. `expo start` sends those headers but EAS Hosting doesn't for this static build, so sync calls would work locally and fail on the live site.
 
+### Moving to a new address
+
+A library lives in the browser, tied to the address it was saved at, so it can't follow people to a new address by itself. To move:
+
+1. Deploy the same build to the new address. Its `/move-in` screen receives libraries.
+2. Set the `BOOKIE_NEW_URL` repository variable (Settings → Secrets and variables → Actions → Variables) to the new address, e.g. `https://bookie.example.com`, and deploy to production again.
+3. `bookie.expo.app` now shows a "Bookie has moved" banner. **Move my books** opens the new address in a new window and hands the library across with `postMessage` (the same JSON as Export backup, plus the shelf layout). Books already there are skipped and nothing at the old address is deleted, so keep it running for a while.
+
+Each side only accepts messages from the other's exact origin (`src/library/move.ts`). Don't send `Cross-Origin-Opener-Policy` from the new address: it cuts the new window off from the old one. Bookie can only open its library in one tab per address, so the move fails if the new address is already open in another tab; the banner says so. Home-screen icons keep opening the old address, and the new site's move-in screen explains how to add the new one.
+
+To try it without touching production, build with `EXPO_PUBLIC_OLD_URL=https://bookie--staging.expo.app`, deploy one build with no alias (the "new" site), then build again with `EXPO_PUBLIC_NEW_URL` set to that deploy's address and `eas deploy --alias staging`.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request into `master` (and on pushes to it):
