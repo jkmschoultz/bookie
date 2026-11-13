@@ -6,15 +6,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/components/alert';
 import { Chip } from '@/components/Chip';
-import { Cover } from '@/components/Cover';
+import { CoverEditor, splitAuthors } from '@/components/CoverEditor';
+import { DateInput } from '@/components/DateInput';
 import { StarRating } from '@/components/StarRating';
 import { Colors, Fonts } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
+import { checkReadingDates } from '@/library/fields';
 import { useChangeStatus } from '@/library/useChangeStatus';
-import { STATUS_LABELS, type Book, type ReadStatus } from '@/types';
+import { STATUS_LABELS, today, type Book, type ReadStatus } from '@/types';
 
 const STATUSES: ReadStatus[] = ['reading', 'read', 'owned', 'want', 'dnf'];
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const COVER_WIDTH = 170;
 
 export default function BookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,6 +37,21 @@ function BookDetails({ book }: { book: Book }) {
   const insets = useSafeAreaInsets();
   const { updateBook, removeBook } = useLibrary();
   const changeStatus = useChangeStatus();
+
+  // Title and author are typed on the cover and saved when a field is left. An empty title goes back to the old one.
+  const [title, setTitle] = useState(book.title);
+  const [authors, setAuthors] = useState(book.authors.join(', '));
+  const saveTitleAndAuthors = () => {
+    const nextTitle = title.trim();
+    const nextAuthors = splitAuthors(authors);
+    if (!nextTitle) {
+      setTitle(book.title);
+      return;
+    }
+    if (nextTitle !== book.title || nextAuthors.join('|') !== book.authors.join('|')) {
+      updateBook(book.id, { title: nextTitle, authors: nextAuthors });
+    }
+  };
 
   const meta = [
     book.pageCount && `${book.pageCount} pages`,
@@ -68,7 +85,15 @@ function BookDetails({ book }: { book: Book }) {
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
         <Animated.View entering={ZoomIn.springify().damping(16)} style={styles.coverWrap}>
-          <Cover book={book} width={170} />
+          <CoverEditor
+            book={book}
+            width={COVER_WIDTH}
+            title={title}
+            authors={authors}
+            onChangeTitle={setTitle}
+            onChangeAuthors={setAuthors}
+            onCommit={saveTitleAndAuthors}
+          />
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(80)} style={styles.center}>
@@ -113,10 +138,12 @@ function BookDetails({ book }: { book: Book }) {
         </Section>
 
         <Section title="Dates">
-          <View style={styles.dates}>
-            <DateField key={`s${book.dateStarted}`} label="Started" value={book.dateStarted} onChange={(dateStarted) => updateBook(book.id, { dateStarted })} />
-            <DateField key={`f${book.dateFinished}`} label="Finished" value={book.dateFinished} onChange={(dateFinished) => updateBook(book.id, { dateFinished })} />
-          </View>
+          <ReadingDates
+            key={`${book.dateStarted}|${book.dateFinished}`}
+            started={book.dateStarted}
+            finished={book.dateFinished}
+            onSave={(patch) => updateBook(book.id, patch)}
+          />
           <Text style={styles.hint}>Added {book.dateAdded}</Text>
         </Section>
 
@@ -142,26 +169,63 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function DateField({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string | null) => void }) {
-  const [text, setText] = useState(value ?? '');
-  const invalid = text !== '' && !DATE_RE.test(text);
-  const save = () => {
-    const next = text.trim() || null;
-    if (!invalid && next !== value) onChange(next);
+/** Started and finished, each a real date or empty, not in the future, and finished no earlier than started. */
+function ReadingDates({
+  started,
+  finished,
+  onSave,
+}: {
+  started: string | null;
+  finished: string | null;
+  onSave: (patch: { dateStarted?: string | null; dateFinished?: string | null }) => void;
+}) {
+  const [text, setText] = useState({ started: started ?? '', finished: finished ?? '' });
+  const now = today();
+  const errors = checkReadingDates(text.started, text.finished, now);
+
+  const commit = (next: typeof text) => {
+    const problems = checkReadingDates(next.started, next.finished, now);
+    if (problems.started || problems.finished) return;
+    const patch: { dateStarted?: string | null; dateFinished?: string | null } = {};
+    if ((next.started || null) !== started) patch.dateStarted = next.started || null;
+    if ((next.finished || null) !== finished) patch.dateFinished = next.finished || null;
+    if (Object.keys(patch).length) onSave(patch);
   };
-  return (
+
+  const field = (key: 'started' | 'finished', label: string) => (
     <View style={{ flex: 1, gap: 4 }}>
-      <Text style={styles.hint}>{label}</Text>
-      <TextInput
-        value={text}
-        onChangeText={setText}
-        onBlur={save}
-        onEndEditing={save}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={Colors.border}
-        keyboardType="numbers-and-punctuation"
-        style={[styles.input, invalid && { borderColor: Colors.danger }]}
+      <View style={styles.dateLabel}>
+        <Text style={styles.hint}>{label}</Text>
+        {text[key] !== '' && (
+          <Pressable
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Clear ${label.toLowerCase()} date`}
+            onPress={() => {
+              const next = { ...text, [key]: '' };
+              setText(next);
+              commit(next);
+            }}>
+            <Text style={styles.clear}>Clear</Text>
+          </Pressable>
+        )}
+      </View>
+      <DateInput
+        value={text[key]}
+        max={now}
+        invalid={!!errors[key]}
+        accessibilityLabel={`${label} date`}
+        onChange={(v) => setText((t) => ({ ...t, [key]: v }))}
+        onCommit={(v) => commit({ ...text, [key]: v })}
       />
+      {errors[key] && <Text style={styles.error}>{errors[key]}</Text>}
+    </View>
+  );
+
+  return (
+    <View style={styles.dates}>
+      {field('started', 'Started')}
+      {field('finished', 'Finished')}
     </View>
   );
 }
@@ -205,7 +269,10 @@ const styles = StyleSheet.create({
   section: { gap: 10 },
   sectionTitle: { color: Colors.textMuted, fontSize: 12, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  dates: { flexDirection: 'row', gap: 12 },
+  dates: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  dateLabel: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  clear: { color: Colors.accent, fontSize: 12, fontWeight: '600' },
+  error: { color: Colors.danger, fontSize: 12 },
   input: {
     color: Colors.text,
     backgroundColor: Colors.surface,
