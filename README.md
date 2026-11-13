@@ -51,7 +51,7 @@ The web app is a static build on Cloudflare Pages (project `mybookie`). CI deplo
 
 ```bash
 npm run deploy:staging      # test build at a fixed staging link (staging.mybookie.pages.dev)
-npm run deploy:web          # production (mybookie.pages.dev)
+npm run deploy:prod         # production (mybookie.pages.dev)
 npm run export:cloudflare   # just the build both use: expo export --platform web, readied for Cloudflare
 ```
 
@@ -75,7 +75,7 @@ The old address is no longer updated, so keep the receiving side working with it
 4. **Preview deploy**: after Build, deploys that build to Cloudflare Pages under the PR's branch name (`<branch>.mybookie.pages.dev`, the same address for every push to the PR) and posts it on the PR. It's a separate, empty library from the live app.
 5. **Deploy to production**: only on pushes to `master` (a merged PR or a direct push). Waits for Tests and Build, then deploys that build to Cloudflare Pages production (`mybookie.pages.dev`). Typecheck & lint doesn't hold it up.
 
-On a PR, the first four run in parallel. `npm run deploy:web` and `npm run deploy:staging` still work for deploying by hand. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
+On a PR, the first four run in parallel. `npm run deploy:prod` and `npm run deploy:staging` still work for deploying by hand. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
 
 - `CLOUDFLARE_API_TOKEN` secret (needed for previews and the production deploy): create one at dash.cloudflare.com → My Profile → API Tokens → Create Token → Custom token, with the permission Account → Cloudflare Pages → Edit, for your account. Without it those jobs skip their Cloudflare steps.
 - `CLOUDFLARE_ACCOUNT_ID` variable (Variables tab): your account ID, shown in the Cloudflare dashboard (Workers & Pages → Overview, on the right) or in the address bar after `dash.cloudflare.com/`.
