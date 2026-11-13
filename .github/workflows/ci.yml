@@ -2,9 +2,8 @@ name: CI
 
 # Every pull request into master is tested, test-built, typechecked and linted, then deployed to a throwaway
 # Cloudflare preview address that's posted on the PR. Once something lands on master (a merge or a direct push) and
-# the tests and build pass, that same build is deployed to production on Cloudflare (mybookie.pages.dev), and to the
-# old address on Expo (bookie.expo.app) so people who haven't moved yet still get it, with the "moved" banner once
-# BOOKIE_NEW_URL is set.
+# the tests and build pass, that same build is deployed to production on Cloudflare (mybookie.pages.dev). The old
+# address on Expo (bookie.expo.app) is frozen on its last deploy, which points people here: see the README.
 #
 # The jobs are separate so they can be treated differently when approving a PR. Tests and Build should be required
 # checks; Typecheck & lint is advisory (it still shows a red cross when it fails, but doesn't have to block).
@@ -27,7 +26,6 @@ permissions:
 env:
   CLOUDFLARE_PROJECT: mybookie
   WRANGLER: wrangler@4.161.0
-  EAS_CLI: eas-cli@27.7.1
 
 jobs:
   tests:
@@ -67,9 +65,6 @@ jobs:
         run: npx expo export --platform web
         env:
           EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
-          # Once Bookie has a new web address, set the BOOKIE_NEW_URL repository variable to it: the old address then
-          # shows a "Bookie has moved" banner that hands each library across. Unset, nothing changes.
-          EXPO_PUBLIC_NEW_URL: ${{ vars.BOOKIE_NEW_URL }}
 
       # Handed to the preview and deploy jobs so they ship exactly what was just built.
       - name: Keep the build for deploying
@@ -189,7 +184,6 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - name: Check for Cloudflare settings
         if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
@@ -200,29 +194,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
 
       - uses: actions/download-artifact@v4
         with:
           name: web-build
           path: dist
 
-      # The new home. Its own copy of the build, readied for Cloudflare; dist stays as is for Expo below.
+      # Cloudflare skips node_modules folders, where Expo puts SQLite's .wasm: see scripts/prepare-cloudflare.mjs.
       - name: Deploy to Cloudflare
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
         run: |
-          cp -r dist dist-cloudflare
-          node scripts/prepare-cloudflare.mjs dist-cloudflare
-          npx --yes "$WRANGLER" pages deploy dist-cloudflare --project-name "$CLOUDFLARE_PROJECT" --branch master --commit-dirty=true
-
-      # The old address keeps getting each release until everyone has moved: libraries saved there stay there.
-      - name: Check for an Expo token
-        if: env.EXPO_TOKEN == ''
-        run: echo "::notice title=Old address not updated::No EXPO_TOKEN secret, so bookie.expo.app keeps its last deploy."
-
-      - run: npm ci
-        if: env.EXPO_TOKEN != ''
-
-      - name: Deploy to the old address on Expo
-        if: env.EXPO_TOKEN != ''
-        run: npx --yes "$EAS_CLI" deploy --prod
+          node scripts/prepare-cloudflare.mjs dist
+          npx --yes "$WRANGLER" pages deploy dist --project-name "$CLOUDFLARE_PROJECT" --branch master --commit-dirty=true
