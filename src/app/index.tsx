@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/components/alert';
+import { MovedBanner } from '@/components/MovedBanner';
 import { QuickActions } from '@/components/QuickActions';
 import { SortBar } from '@/components/SortBar';
 import { Bookcase } from '@/components/shelf/Bookcase';
@@ -76,6 +77,8 @@ export default function BookshelfScreen() {
           </Pressable>
         </View>
       </View>
+
+      <MovedBanner />
 
       {loaded && books.length === 0 ? (
         <EmptyLibrary onSample={() => addBooks(sampleBooks())} />

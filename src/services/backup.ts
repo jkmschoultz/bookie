@@ -1,4 +1,4 @@
-import { emptyDraft, today, type Book, type NewBook } from '@/types';
+import { bookKey, emptyDraft, today, type Book, type NewBook } from '@/types';
 
 const VERSION = 1;
 
@@ -56,4 +56,10 @@ export function parseBackup(text: string): NewBook[] {
       for (const k of keys) if (b[k] !== undefined) (book as Record<string, unknown>)[k] = b[k];
       return book;
     });
+}
+
+/** The restored books that aren't already on the shelves (same ISBN, or same title and first author). */
+export function onlyNewBooks(restored: NewBook[], existing: Pick<Book, 'isbn13' | 'title' | 'authors'>[]): NewBook[] {
+  const known = new Set(existing.map(bookKey));
+  return restored.filter((b) => !known.has(bookKey(b)));
 }

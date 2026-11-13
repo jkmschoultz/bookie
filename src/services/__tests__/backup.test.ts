@@ -1,6 +1,6 @@
 import { makeBook } from '@/test/makeBook';
 
-import { backupFileName, parseBackup, toBackup } from '../backup';
+import { backupFileName, onlyNewBooks, parseBackup, toBackup } from '../backup';
 
 describe('backup', () => {
   const books = [
@@ -37,5 +37,17 @@ describe('backup', () => {
 
   it('names the file by date', () => {
     expect(backupFileName('2026-11-10')).toBe('bookie-backup-2026-11-10.json');
+  });
+
+  it('keeps only the restored books that are not on the shelves yet', () => {
+    const shelf = [makeBook({ title: 'Dune', authors: ['Frank Herbert'] }), makeBook({ title: 'Other', isbn13: '9780000000001' })];
+    const restored = parseBackup(
+      toBackup([
+        makeBook({ title: 'DUNE', authors: ['frank herbert'] }),
+        makeBook({ title: 'Same ISBN, new title', isbn13: '9780000000001' }),
+        makeBook({ title: 'Emma', authors: ['Jane Austen'] }),
+      ]),
+    );
+    expect(onlyNewBooks(restored, shelf).map((b) => b.title)).toEqual(['Emma']);
   });
 });
