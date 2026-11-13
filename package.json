@@ -57,7 +57,8 @@
     "lint": "expo lint",
     "test": "jest",
     "export:cloudflare": "expo export --platform web && node scripts/prepare-cloudflare.mjs",
-    "deploy:cloudflare": "npm run export:cloudflare && npx wrangler@4.161.0 pages deploy dist --project-name mybookie --branch master"
+    "deploy:web": "npm run export:cloudflare && npx wrangler@4.161.0 pages deploy dist --project-name mybookie --branch master",
+    "deploy:staging": "npm run export:cloudflare && npx wrangler@4.161.0 pages deploy dist --project-name mybookie --branch staging"
   },
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
