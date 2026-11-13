@@ -6,8 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/components/alert';
 import { Chip } from '@/components/Chip';
-import { COVER_ASPECT } from '@/components/Cover';
-import { CoverEditor, splitAuthors } from '@/components/CoverEditor';
+import { COVER_ASPECT, Cover } from '@/components/Cover';
+import { CoverZoom } from '@/components/CoverZoom';
 import { DateInput } from '@/components/DateInput';
 import { StarRating } from '@/components/StarRating';
 import { Colors, Fonts } from '@/constants/theme';
@@ -75,20 +75,12 @@ function BookDetails({ book }: { book: Book }) {
     };
   }, [reduceMotion]);
 
-  // Title and author are typed on the cover and saved when a field is left. An empty title goes back to the old one.
-  const [title, setTitle] = useState(book.title);
-  const [authors, setAuthors] = useState(book.authors.join(', '));
-  const saveTitleAndAuthors = () => {
-    const nextTitle = title.trim();
-    const nextAuthors = splitAuthors(authors);
-    if (!nextTitle) {
-      setTitle(book.title);
-      return;
-    }
-    if (nextTitle !== book.title || nextAuthors.join('|') !== book.authors.join('|')) {
-      updateBook(book.id, { title: nextTitle, authors: nextAuthors });
-    }
-  };
+  // Tapping the cover shows it big (CoverZoom), growing from where it is on the page.
+  const [zoomFrom, setZoomFrom] = useState<Rect | null>(null);
+  const zoomCover = () =>
+    coverRef.current?.measureInWindow((x, y, width) =>
+      setZoomFrom({ x: x + (width - COVER_WIDTH) / 2, y, width: COVER_WIDTH, height: COVER_WIDTH * COVER_ASPECT }),
+    );
 
   const meta = [
     book.pageCount && `${book.pageCount} pages`,
@@ -131,15 +123,14 @@ function BookDetails({ book }: { book: Book }) {
           onLayout={reportCover}
           entering={flewIn ? undefined : ZoomIn.springify().damping(16)}
           style={[styles.coverWrap, landing && { opacity: 0 }]}>
-          <CoverEditor
-            book={book}
-            width={COVER_WIDTH}
-            title={title}
-            authors={authors}
-            onChangeTitle={setTitle}
-            onChangeAuthors={setAuthors}
-            onCommit={saveTitleAndAuthors}
-          />
+          <Pressable
+            onPress={zoomCover}
+            accessibilityRole="button"
+            accessibilityLabel="Show the cover bigger"
+            // While it's shown big, its place on the page is empty.
+            style={zoomFrom && { opacity: 0 }}>
+            <Cover book={book} width={COVER_WIDTH} />
+          </Pressable>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(80)} style={styles.center}>
@@ -202,6 +193,7 @@ function BookDetails({ book }: { book: Book }) {
         </Pressable>
         {book.isbn13 && <Text style={styles.hint}>ISBN {book.isbn13}</Text>}
       </ScrollView>
+      {zoomFrom && <CoverZoom book={book} from={zoomFrom} onClose={() => setZoomFrom(null)} />}
     </>
   );
 }

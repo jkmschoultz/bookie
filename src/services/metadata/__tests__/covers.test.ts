@@ -1,4 +1,5 @@
 import { distinctCoverIds, findCoverOptions } from '../covers';
+import { largeCoverUrl } from '../openLibrary';
 
 const json = (body: unknown) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
 
@@ -36,5 +37,20 @@ describe('cover options', () => {
     jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
     expect(await findCoverOptions({ title: 'Dune' })).toEqual([]);
     expect(await findCoverOptions({ workKey: '../../evil', title: 'Dune' })).toEqual([]);
+  });
+});
+
+describe('largeCoverUrl', () => {
+  it('asks Open Library for the large size of a medium cover', () => {
+    expect(largeCoverUrl('https://covers.openlibrary.org/b/id/123-M.jpg')).toBe('https://covers.openlibrary.org/b/id/123-L.jpg');
+    expect(largeCoverUrl('https://covers.openlibrary.org/b/isbn/9780441013593-M.jpg')).toBe(
+      'https://covers.openlibrary.org/b/isbn/9780441013593-L.jpg',
+    );
+  });
+
+  it('leaves other covers alone', () => {
+    expect(largeCoverUrl('https://books.google.com/books/content?id=x&img=1')).toBe('https://books.google.com/books/content?id=x&img=1');
+    expect(largeCoverUrl('data:image/jpeg;base64,AAAA')).toBe('data:image/jpeg;base64,AAAA');
+    expect(largeCoverUrl(null)).toBeNull();
   });
 });
