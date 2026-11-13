@@ -24,7 +24,7 @@ A reading tracker that shows your library as a virtual bookshelf. Swipe along sh
 
 ## Built with
 
-Expo (SDK 58), React Native and Expo Router, TypeScript, SQLite (`expo-sqlite`), Zustand and Reanimated. The shelf engine in `src/shelf/` is plain TypeScript with unit tests (Jest). Pull requests are checked by GitHub Actions, which also deploys to EAS Hosting.
+Expo (SDK 58), React Native and Expo Router, TypeScript, SQLite (`expo-sqlite`), Zustand and Reanimated. The shelf engine in `src/shelf/` is plain TypeScript with unit tests (Jest). Pull requests are checked by GitHub Actions, which also deploys to Cloudflare Pages (and, while people move over, to the old address on EAS Hosting).
 
 All data stays on the device in SQLite, so use Settings → Export backup to keep a copy. It runs in **Expo Go** (once the SDK 58 Expo Go is out on the stores; until then use a development build) and on the **web**.
 
@@ -73,14 +73,17 @@ To try it without touching production, build with `EXPO_PUBLIC_OLD_URL=https://b
 1. **Tests**: the unit tests. Required to merge.
 2. **Build**: the same web export the deploy uses. Required to merge.
 3. **Typecheck & lint**: advisory. A failure shows as a red cross on the PR but doesn't have to block merging.
-4. **Preview deploy**: after Build, deploys that build to an unnamed EAS Hosting address and posts it on the PR. It's a separate, empty library from the live app, and Expo deletes it after 30 days. It doesn't use one of the 5 named aliases.
+4. **Preview deploy**: after Build, deploys that build to Cloudflare Pages under the PR's branch name (`<branch>.mybookie.pages.dev`, the same address for every push to the PR) and posts it on the PR. It's a separate, empty library from the live app.
 
-5. **Deploy to production**: only on pushes to `master` (a merged PR or a direct push). Waits for Tests and Build, then deploys that build with `eas deploy --prod`. Typecheck & lint doesn't hold it up.
+5. **Deploy to production**: only on pushes to `master` (a merged PR or a direct push). Waits for Tests and Build, then deploys that build to Cloudflare Pages production (`mybookie.pages.dev`), and to the old address with `eas deploy --prod` so people who haven't moved their library yet still get each release. Typecheck & lint doesn't hold it up.
 
-On a PR, the first four run in parallel. `npm run deploy:web` still works for deploying by hand. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
+On a PR, the first four run in parallel. `npm run deploy:cloudflare` (and `npm run deploy:web` for the old address) still work for deploying by hand. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
 
-- `EXPO_TOKEN` (needed for previews and the production deploy): create one at expo.dev → Account settings → Access tokens. Without it those jobs just skip.
-- `GOOGLE_BOOKS_API_KEY` (optional): the same value as in `.env.local`, so preview builds match the live app.
+- `CLOUDFLARE_API_TOKEN` secret (needed for previews and the production deploy): create one at dash.cloudflare.com → My Profile → API Tokens → Create Token → Custom token, with the permission Account → Cloudflare Pages → Edit, for your account. Without it those jobs skip their Cloudflare steps.
+- `CLOUDFLARE_ACCOUNT_ID` variable (Variables tab): your account ID, shown in the Cloudflare dashboard (Workers & Pages → Overview, on the right) or in the address bar after `dash.cloudflare.com/`.
+- `EXPO_TOKEN` secret (keeps the old address updated): create one at expo.dev → Account settings → Access tokens. Without it the old address keeps its last deploy.
+- `BOOKIE_NEW_URL` variable: `https://mybookie.pages.dev`. Set it once the Cloudflare site is live: from the next production deploy, the old address shows the "Bookie has moved" banner (see Moving to a new address).
+- `GOOGLE_BOOKS_API_KEY` secret (optional): the same value as in `.env.local`, so preview builds match the live app.
 
 To block merging until the right checks pass: Settings → Branches (or Rules → Rulesets) → protect `master` → require a pull request and require the **Tests** and **Build** status checks. Leave **Typecheck & lint** (and **Preview deploy**) off that list to keep them optional. Check names come from each job's `name:` in the workflow, and a check only appears in the list after it has run once.
 
