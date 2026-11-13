@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { alert } from '@/components/alert';
 import { Colors } from '@/constants/theme';
@@ -9,6 +9,7 @@ import { useChangeStatus } from '@/library/useChangeStatus';
 import { STATUS_LABELS, type Book, type ReadStatus } from '@/types';
 
 import { Chip } from './Chip';
+import { Sheet } from './Sheet';
 
 interface Props {
   book: Book | null;
@@ -19,10 +20,13 @@ interface Props {
 const STATUSES: ReadStatus[] = ['reading', 'read', 'owned', 'want', 'dnf'];
 
 /** Long-press sheet: change status or remove without leaving the shelf. */
-export function QuickActions({ book, onClose, onOpen }: Props) {
+export function QuickActions({ book: current, onClose, onOpen }: Props) {
+  // Keep showing the last book while the sheet slides away.
+  const [last, setLast] = useState(current);
+  if (current && current !== last) setLast(current);
+  const book = current ?? last;
   const { updateBook, removeBook } = useLibrary();
   const changeStatus = useChangeStatus();
-  const insets = useSafeAreaInsets();
 
   const confirmRemove = (b: Book) =>
     alert('Remove book?', `“${b.title}” will be taken off your shelves.`, [
@@ -38,10 +42,9 @@ export function QuickActions({ book, onClose, onOpen }: Props) {
     ]);
 
   return (
-    <Modal visible={!!book} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
+    <Sheet visible={!!current} onClose={onClose} accessibilityLabel="Book actions">
       {book && (
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={styles.content}>
           <Text style={styles.title} numberOfLines={2}>
             {book.title}
           </Text>
@@ -95,19 +98,12 @@ export function QuickActions({ book, onClose, onOpen }: Props) {
           </View>
         </View>
       )}
-    </Modal>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    padding: 20,
-    gap: 6,
-  },
+  content: { gap: 6, paddingTop: 4 },
   title: { color: Colors.text, fontSize: 20, fontWeight: '700' },
   author: { color: Colors.textMuted, fontSize: 15, marginBottom: 12 },
   statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 2 },

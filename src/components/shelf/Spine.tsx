@@ -1,10 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useRef, type ComponentRef } from 'react';
+import { memo, useEffect, useRef, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Colors, Fonts } from '@/constants/theme';
-import { useBookFlight, type Rect, type SpineRect } from '@/library/bookFlight';
+import { registerSpine, useBookFlight, type Rect, type SpineRect } from '@/library/bookFlight';
 import { DECORATION, UNOWNED_OPACITY, type SpineStyle } from '@/shelf/spineStyle';
 import { LINE_HEIGHT } from '@/shelf/spineText';
 import type { Book } from '@/types';
@@ -104,8 +104,21 @@ function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
     transform: [{ translateY: -14 * lift.value }, { scale: 1 + 0.04 * lift.value }],
     zIndex: lift.value > 0 ? 10 : 0,
   }));
-  // While this book is flying to its page it isn't on the shelf.
+  // While this book is flying to or from its page it isn't on the shelf.
   const away = useBookFlight((f) => f.flight?.book.id === book.id);
+  // Let a book coming back from its page find where to land.
+  useEffect(
+    () =>
+      registerSpine(
+        book.id,
+        () =>
+          new Promise((resolve) => {
+            if (!ref.current) resolve(null);
+            else ref.current.measureInWindow((x, y, width, height) => resolve({ x, y, width, height, style: s }));
+          }),
+      ),
+    [book.id, s],
+  );
 
   const open = () => {
     lift.value = withTiming(1, { duration: 140 });

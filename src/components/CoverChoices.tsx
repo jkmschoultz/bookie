@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
 import type { Book } from '@/types';
@@ -21,10 +22,16 @@ interface Props {
   onUpload: () => void;
 }
 
-/** A row of cover thumbnails to pick from: plain, each one found, and the reader's own photo. */
+/** A row of covers to pick from: add your own photo, a plain cover, then each one found. */
 export function CoverChoices({ book, selected, options, loading, onChoose, onUpload }: Props) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroller} contentContainerStyle={styles.row}>
+      <Tile selected={false} label="Choose your own photo" onPress={onUpload}>
+        <View style={[styles.tile, styles.placeholder]}>
+          <Text style={styles.plus}>＋</Text>
+          <Text style={styles.upload}>Your photo</Text>
+        </View>
+      </Tile>
       <Tile selected={selected == null} label="Plain cover" onPress={() => onChoose(null)}>
         <Cover book={{ ...book, coverUrl: null }} width={TILE} />
       </Tile>
@@ -36,12 +43,6 @@ export function CoverChoices({ book, selected, options, loading, onChoose, onUpl
           <ActivityIndicator color={Colors.accent} />
         </View>
       )}
-      <Tile selected={false} label="Choose your own photo" onPress={onUpload}>
-        <View style={[styles.tile, styles.placeholder]}>
-          <Text style={styles.plus}>＋</Text>
-          <Text style={styles.upload}>Your photo</Text>
-        </View>
-      </Tile>
     </ScrollView>
   );
 }
@@ -51,7 +52,8 @@ function Thumb({ url, selected, onPress }: { url: string; selected: boolean; onP
   // Hide covers that fail to load, or that are Open Library's 1x1 "no cover" image.
   if (broken) return null;
   return (
-    <Tile selected={selected} label="Cover option" onPress={onPress}>
+    <Animated.View entering={FadeIn.duration(220)} layout={LinearTransition.duration(200)}>
+      <Tile selected={selected} label="Cover option" onPress={onPress}>
       <Image
         source={url}
         style={styles.tile}
@@ -59,8 +61,9 @@ function Thumb({ url, selected, onPress }: { url: string; selected: boolean; onP
         transition={150}
         onError={() => setBroken(true)}
         onLoad={(e) => e.source.width < 10 && setBroken(true)}
-      />
-    </Tile>
+        />
+      </Tile>
+    </Animated.View>
   );
 }
 

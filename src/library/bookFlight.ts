@@ -21,34 +21,64 @@ export interface SpineRect extends Rect {
 
 export interface Flight {
   book: Book;
-  from: SpineRect;
-  /** Where the cover sits on the book's page, once that page has laid out. */
-  to: Rect | null;
+  /** `open`: shelf to page. `close`: back from the page to the shelf. */
+  direction: 'open' | 'close';
+  /** The spine on its shelf. On the way back it's only known once the shelf is showing again. */
+  spine: SpineRect | null;
+  /** The cover on the book's page. On the way there it's only known once the page has laid out. */
+  cover: Rect | null;
 }
 
 interface FlightStore {
   flight: Flight | null;
-  /** A book leaves its shelf. Its spine hides and the book page hides its cover until `finish`. */
-  start: (book: Book, from: SpineRect) => void;
+  /** A book leaves its shelf. Its spine hides, and its page hides its cover until `finish`. */
+  start: (book: Book, spine: SpineRect) => void;
   /** The book page reports where its cover is, and the book flies there. */
-  land: (bookId: number, to: Rect) => void;
-  /** The book has arrived (or the flight was called off): the page shows its own cover again. */
+  land: (bookId: number, cover: Rect) => void;
+  /** Leaving the book page: the book flies back from where its cover was. */
+  returnToShelf: (book: Book, cover: Rect) => void;
+  /** The shelf reports where the spine is, and the returning book flies there. */
+  shelve: (bookId: number, spine: SpineRect) => void;
+  /** The book has arrived (or the flight was called off). */
   finish: () => void;
 }
 
 /**
- * A book's trip from the shelf to its page: it comes out of the shelf, turns from its spine to its front cover, and
- * lands where the page shows the cover. `BookFlight` draws it above every screen.
+ * A book's trip between its shelf and its page: it comes out of the shelf, turns from its spine to its front cover, and
+ * lands where the page shows the cover; and back again. `BookFlight` draws it above every screen.
  */
 export const useBookFlight = create<FlightStore>((set) => ({
   flight: null,
-  start: (book, from) => set({ flight: { book, from, to: null } }),
-  land: (bookId, to) => set((s) => (s.flight?.book.id === bookId && !s.flight.to ? { flight: { ...s.flight, to } } : s)),
+  start: (book, spine) => set({ flight: { book, direction: 'open', spine, cover: null } }),
+  land: (bookId, cover) =>
+    set((s) => (s.flight?.direction === 'open' && s.flight.book.id === bookId && !s.flight.cover ? { flight: { ...s.flight, cover } } : s)),
+  returnToShelf: (book, cover) => set({ flight: { book, direction: 'close', spine: null, cover } }),
+  shelve: (bookId, spine) =>
+    set((s) => (s.flight?.direction === 'close' && s.flight.book.id === bookId && !s.flight.spine ? { flight: { ...s.flight, spine } } : s)),
   finish: () => set({ flight: null }),
 }));
 
+type MeasureSpine = () => Promise<SpineRect | null>;
+const spines = new Map<number, MeasureSpine>();
+
+/** Each spine on a shelf registers how to find it on screen, for a book flying back to it. Returns the unregister. */
+export function registerSpine(bookId: number, measure: MeasureSpine): () => void {
+  spines.set(bookId, measure);
+  return () => {
+    if (spines.get(bookId) === measure) spines.delete(bookId);
+  };
+}
+
+/** Where a book's spine is on screen, or null if it isn't on a shelf in view (scrolled away, filtered out, a pile). */
+export async function findSpine(bookId: number, screen: { width: number; height: number }): Promise<SpineRect | null> {
+  const rect = await spines.get(bookId)?.();
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+  const onScreen = rect.x + rect.width > 0 && rect.x < screen.width && rect.y + rect.height > 0 && rect.y < screen.height;
+  return onScreen ? rect : null;
+}
+
 /**
- * Where the flying book is at `p` (0 = on the shelf, 1 = landed) and how far it has turned, 0° (spine facing you) to
+ * Where the flying book is at `p` (0 = on the shelf, 1 = on the page) and how far it has turned, 0° (spine facing you) to
  * 90° (cover facing you). Pure, so it can be tested and run on the UI thread.
  *
  * The book turns about the corner where spine meets cover (the hinge), so that corner moves from the spine's right

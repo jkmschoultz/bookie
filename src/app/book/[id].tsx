@@ -1,7 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentRef } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeInDown, useReducedMotion, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/components/alert';
@@ -12,7 +12,7 @@ import { DateInput } from '@/components/DateInput';
 import { StarRating } from '@/components/StarRating';
 import { Colors, Fonts } from '@/constants/theme';
 import { useLibrary } from '@/library/LibraryProvider';
-import { useBookFlight } from '@/library/bookFlight';
+import { useBookFlight, type Rect } from '@/library/bookFlight';
 import { checkReadingDates } from '@/library/fields';
 import { useChangeStatus } from '@/library/useChangeStatus';
 import { STATUS_LABELS, today, type Book, type ReadStatus } from '@/types';
@@ -44,19 +44,36 @@ function BookDetails({ book }: { book: Book }) {
   const landing = useBookFlight((f) => f.flight?.book.id === book.id);
   const [flewIn] = useState(landing);
   const land = useBookFlight((f) => f.land);
-  const finishFlight = useBookFlight((f) => f.finish);
   const coverRef = useRef<ComponentRef<typeof View>>(null);
+  // Where the cover was last seen on screen, and the scroll position then, for the flight back to the shelf.
+  const coverSeen = useRef<{ rect: Rect; scrollY: number } | null>(null);
+  const scrollY = useRef(0);
   const reportCover = () =>
-    coverRef.current?.measureInWindow((x, y, width) =>
-      land(book.id, { x: x + (width - COVER_WIDTH) / 2, y, width: COVER_WIDTH, height: COVER_WIDTH * COVER_ASPECT }),
-    );
-  // Leaving before it lands (a quick Back) calls the flight off.
-  useEffect(
-    () => () => {
-      if (useBookFlight.getState().flight?.book.id === book.id) finishFlight();
-    },
-    [book.id, finishFlight],
-  );
+    coverRef.current?.measureInWindow((x, y, width) => {
+      const rect = { x: x + (width - COVER_WIDTH) / 2, y, width: COVER_WIDTH, height: COVER_WIDTH * COVER_ASPECT };
+      coverSeen.current = { rect, scrollY: scrollY.current };
+      land(book.id, rect);
+    });
+  const reduceMotion = useReducedMotion();
+  const latest = useRef(book);
+  useEffect(() => {
+    latest.current = book;
+  }, [book]);
+  // Leaving the page sends the book back to its shelf, the way it came. A layout effect, so the flight is already
+  // underway when the shelf screen shows (and its own screen transition sees it and stays put).
+  useLayoutEffect(() => {
+    const openedAt = Date.now();
+    return () => {
+      const { flight, finish, returnToShelf } = useBookFlight.getState();
+      // Leaving before it landed (a quick Back) calls the trip here off first.
+      if (flight?.book.id === latest.current.id) finish();
+      const seen = coverSeen.current;
+      // (Development runs effects twice on mount; that isn't leaving.)
+      if (Platform.OS !== 'web' || reduceMotion || !seen || Date.now() - openedAt < 300) return;
+      const rect = { ...seen.rect, y: seen.rect.y - (scrollY.current - seen.scrollY) };
+      if (rect.y + rect.height > 0) returnToShelf(latest.current, rect);
+    };
+  }, [reduceMotion]);
 
   // Title and author are typed on the cover and saved when a field is left. An empty title goes back to the old one.
   const [title, setTitle] = useState(book.title);
@@ -103,7 +120,12 @@ function BookDetails({ book }: { book: Book }) {
           ),
         }}
       />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        alwaysBounceVertical
+        onScroll={(e) => (scrollY.current = e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={32}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
         <Animated.View
           ref={coverRef}
           onLayout={reportCover}

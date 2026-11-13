@@ -3,11 +3,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeInDown, FadeOut, LayoutAnimationConfig, LinearTransition, ZoomIn } from 'react-native-reanimated';
 
 import { alert } from '@/components/alert';
 import { Chip } from '@/components/Chip';
 import { CoverChoices } from '@/components/CoverChoices';
 import { CoverEditor } from '@/components/CoverEditor';
+import { YearPicker } from '@/components/YearPicker';
 import { Colors } from '@/constants/theme';
 import {
   checkHeight,
@@ -119,7 +121,9 @@ export default function BookFormScreen() {
   const errors = formErrors(form);
 
   // The usual genres, any of the reader's own from other books, and any this book already has.
-  const genreChoices = [...new Set([...GENRES, ...books.flatMap((b) => b.genres), ...form.genres])];
+  const genreChoices = [...new Set([...GENRES, ...books.flatMap((b) => b.genres), ...form.genres])].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' }),
+  );
   const [newGenre, setNewGenre] = useState<string | null>(null);
   const addGenre = () => {
     const genre = cleanGenre(newGenre ?? '', genreChoices);
@@ -239,14 +243,7 @@ export default function BookFormScreen() {
         </View>
         <View style={styles.pair}>
           <Field label="Pages" value={form.pageCount} onChange={set('pageCount')} numeric filter={(v) => digitsOnly(v, 5)} error={errors.pageCount} />
-          <Field
-            label="Year published"
-            value={form.publishedYear}
-            onChange={set('publishedYear')}
-            numeric
-            filter={(v) => digitsOnly(v, 4)}
-            error={errors.publishedYear}
-          />
+          <YearPicker label="Year published" value={form.publishedYear} onChange={set('publishedYear')} error={errors.publishedYear} />
         </View>
         <Field label="Publisher" value={form.publisher} onChange={set('publisher')} />
         <View style={styles.pair}>
@@ -255,20 +252,29 @@ export default function BookFormScreen() {
         </View>
 
         <Text style={styles.label}>Genres</Text>
-        <View style={styles.wrap}>
-          {genreChoices.map((g) => (
-            <Chip
-              key={g}
-              small
-              label={g}
-              selected={form.genres.includes(g)}
-              onPress={() => set('genres')(form.genres.includes(g) ? form.genres.filter((x) => x !== g) : [...form.genres, g])}
-            />
-          ))}
-          {newGenre == null && <Chip small label="＋ New genre" selected={false} onPress={() => setNewGenre('')} />}
-        </View>
+        {/* Chips zoom in only when added, not all at once when the form opens. */}
+        <LayoutAnimationConfig skipEntering>
+          <View style={styles.wrap}>
+            {genreChoices.map((g) => (
+              // A genre you add slides into its place in the alphabet, nudging the others along.
+              <Animated.View key={g} entering={ZoomIn.duration(220)} layout={LinearTransition.duration(220)}>
+                <Chip
+                  small
+                  label={g}
+                  selected={form.genres.includes(g)}
+                  onPress={() => set('genres')(form.genres.includes(g) ? form.genres.filter((x) => x !== g) : [...form.genres, g])}
+                />
+              </Animated.View>
+            ))}
+            {newGenre == null && (
+              <Animated.View layout={LinearTransition.duration(220)}>
+                <Chip small label="＋ New genre" selected={false} onPress={() => setNewGenre('')} />
+              </Animated.View>
+            )}
+          </View>
+        </LayoutAnimationConfig>
         {newGenre != null && (
-          <View style={styles.genreRow}>
+          <Animated.View entering={FadeInDown.duration(200)} exiting={FadeOut.duration(120)} style={styles.genreRow}>
             <TextInput
               value={newGenre}
               onChangeText={setNewGenre}
@@ -284,7 +290,7 @@ export default function BookFormScreen() {
             <Pressable style={styles.addGenre} onPress={addGenre} accessibilityRole="button">
               <Text style={styles.addGenreText}>Add</Text>
             </Pressable>
-          </View>
+          </Animated.View>
         )}
         <Text style={styles.hint}>
           {form.genres.length
