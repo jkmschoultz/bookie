@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { StyleSheet, Text, View, type TextStyle } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
 import { getSpineStyle } from '@/shelf/spineStyle';
@@ -11,11 +11,13 @@ interface Props {
   width: number;
 }
 
+/** Covers are 2:3, like most paperbacks. */
+export const COVER_ASPECT = 1.5;
+
 /** The book's cover image, or a generated cloth cover in the spine's colours. */
 export function Cover({ book, width }: Props) {
   const [failed, setFailed] = useState(false);
-  const height = width * 1.5;
-  const s = getSpineStyle(book);
+  const height = width * COVER_ASPECT;
 
   if (book.coverUrl && !failed) {
     return (
@@ -30,15 +32,42 @@ export function Cover({ book, width }: Props) {
       />
     );
   }
+  const text = plainCoverText(book, width);
   return (
-    <View style={[styles.cover, styles.generated, { width, height, backgroundColor: s.color }]}>
+    <PlainCover
+      book={book}
+      width={width}
+      title={
+        <Text style={text.title} numberOfLines={4}>
+          {book.title}
+        </Text>
+      }
+      author={
+        <Text style={text.author} numberOfLines={2}>
+          {book.authors.join(', ')}
+        </Text>
+      }
+    />
+  );
+}
+
+/** Title and author type for a plain cover of this width, in the book's colours. */
+export function plainCoverText(book: Book, width: number): { title: TextStyle; author: TextStyle } {
+  const s = getSpineStyle(book);
+  return {
+    title: { ...styles.title, color: s.textColor, fontFamily: Fonts.serif, fontSize: width / 9 },
+    author: { ...styles.author, color: s.textColor, fontSize: width / 15 },
+  };
+}
+
+/** A cloth cover in the spine's colours, with whatever title and author nodes it's given between two rules. */
+export function PlainCover({ book, width, title, author }: { book: Book; width: number; title: ReactNode; author: ReactNode }) {
+  const s = getSpineStyle(book);
+  return (
+    <View style={[styles.cover, styles.generated, { width, height: width * COVER_ASPECT, backgroundColor: s.color }]}>
       <View style={[styles.rule, { backgroundColor: s.accentColor }]} />
-      <Text style={[styles.title, { color: s.textColor, fontFamily: Fonts.serif, fontSize: width / 9 }]} numberOfLines={4}>
-        {book.title}
-      </Text>
-      <Text style={[styles.author, { color: s.textColor, fontSize: width / 15 }]} numberOfLines={2}>
-        {book.authors.join(', ')}
-      </Text>
+      {title}
+      {author}
       <View style={[styles.rule, { backgroundColor: s.accentColor }]} />
     </View>
   );

@@ -7,6 +7,7 @@ import { Shelf, Wood } from '@/constants/theme';
 import { combineRanges, groupBooks, type ShelfGroup, type SortMode } from '@/shelf/grouping';
 import { layoutShelves, type LayoutMode, type ShelfRow as Row } from '@/shelf/layout';
 import { spineWidth } from '@/shelf/spineStyle';
+import type { SpineRect } from '@/library/bookFlight';
 import type { Book } from '@/types';
 
 import { SHELF_ROW_HEIGHT, ShelfRow } from './ShelfRow';
@@ -15,7 +16,7 @@ interface Props {
   books: Book[];
   sortMode: SortMode;
   layoutMode: LayoutMode;
-  onOpen: (book: Book) => void;
+  onOpen: (book: Book, from?: SpineRect) => void;
   onLongPress: (book: Book) => void;
   bottomInset?: number;
 }

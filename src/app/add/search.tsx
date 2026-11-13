@@ -43,7 +43,8 @@ export default function SearchScreen() {
     setOpening(doc.key);
     try {
       setDraft(await completeSearchResult(doc));
-      router.push('/add/manual');
+      // The work key lets the form offer the covers of the book's other editions.
+      router.push({ pathname: '/add/manual', params: { work: doc.key } });
     } finally {
       setOpening(null);
     }

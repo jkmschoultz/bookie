@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Suspense } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { BookFlight } from '@/components/BookFlight';
+import { ScreenTransitions } from '@/components/ScreenTransitions';
 import { StorageErrorBoundary } from '@/components/StorageError';
 import { Colors } from '@/constants/theme';
 import { migrate } from '@/db/migrations';
@@ -36,18 +38,22 @@ export default function RootLayout() {
                 <StatusBar style="light" />
                 {/* On iOS 26 the header is see-through and screens run underneath it, so each screen's main scroll view
                     uses contentInsetAdjustmentBehavior="automatic" to start below it. */}
-                <Stack screenOptions={{ headerTintColor: Colors.accent, headerTitleStyle: { color: Colors.text } }}>
-                  <Stack.Screen name="index" options={{ headerShown: false }} />
-                  <Stack.Screen name="book/[id]" options={{ title: '', presentation: 'modal' }} />
-                  <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
-                  <Stack.Screen name="welcome" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-                  <Stack.Screen name="add/index" options={{ title: 'Add books', presentation: 'modal' }} />
-                  <Stack.Screen name="add/search" options={{ title: 'Search' }} />
-                  <Stack.Screen name="add/scan" options={{ title: 'Scan barcode' }} />
-                  <Stack.Screen name="add/manual" options={{ title: 'Book details' }} />
-                  <Stack.Screen name="add/import" options={{ title: 'Import from Goodreads' }} />
-                  <Stack.Screen name="add/goodreads" options={{ title: 'Goodreads' }} />
-                </Stack>
+                <ScreenTransitions>
+                  <Stack screenOptions={{ headerTintColor: Colors.accent, headerTitleStyle: { color: Colors.text } }}>
+                    <Stack.Screen name="index" options={{ headerShown: false }} />
+                    <Stack.Screen name="book/[id]" options={{ title: '', presentation: 'modal' }} />
+                    <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
+                    <Stack.Screen name="move-in" options={{ headerShown: false }} />
+                    <Stack.Screen name="welcome" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+                    <Stack.Screen name="add/index" options={{ title: 'Add books', presentation: 'modal' }} />
+                    <Stack.Screen name="add/search" options={{ title: 'Search' }} />
+                    <Stack.Screen name="add/scan" options={{ title: 'Scan barcode' }} />
+                    <Stack.Screen name="add/manual" options={{ title: 'Book details' }} />
+                    <Stack.Screen name="add/import" options={{ title: 'Import from Goodreads' }} />
+                    <Stack.Screen name="add/goodreads" options={{ title: 'Goodreads' }} />
+                  </Stack>
+                </ScreenTransitions>
+                <BookFlight />
               </LibraryProvider>
             </SQLiteProvider>
           </Suspense>

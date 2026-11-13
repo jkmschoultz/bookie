@@ -2,14 +2,17 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/components/alert';
+import { MovedBanner } from '@/components/MovedBanner';
 import { QuickActions } from '@/components/QuickActions';
 import { SortBar } from '@/components/SortBar';
 import { Bookcase } from '@/components/shelf/Bookcase';
 import { Colors, Fonts } from '@/constants/theme';
+import { PULL_OUT_MS, useBookFlight, type SpineRect } from '@/library/bookFlight';
 import { useLibrary } from '@/library/LibraryProvider';
 import { markOnboardingSeen, tourStatus } from '@/library/onboarding';
 import { sampleBooks } from '@/library/sampleBooks';
@@ -44,10 +47,22 @@ export default function BookshelfScreen() {
     [books, statusFilter, ownedFilter],
   );
 
-  const openBook = useCallback((book: Book) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push({ pathname: '/book/[id]', params: { id: String(book.id) } });
-  }, []);
+  const reduceMotion = useReducedMotion();
+  const startFlight = useBookFlight((f) => f.start);
+  const openBook = useCallback(
+    (book: Book, from?: SpineRect) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // The book flies from its shelf to its page on web, where the page opens in place under it. On phones the page
+      // slides up as a native sheet, which would cover the flying book, so it opens as before.
+      const open = () => router.push({ pathname: '/book/[id]', params: { id: String(book.id) } });
+      if (from && Platform.OS === 'web' && !reduceMotion) {
+        startFlight(book, from);
+        // Let it come out of the shelf first, with the shelf still there behind it.
+        setTimeout(open, PULL_OUT_MS);
+      } else open();
+    },
+    [reduceMotion, startFlight],
+  );
 
   const showActions = useCallback((book: Book) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -76,6 +91,8 @@ export default function BookshelfScreen() {
           </Pressable>
         </View>
       </View>
+
+      <MovedBanner />
 
       {loaded && books.length === 0 ? (
         <EmptyLibrary onSample={() => addBooks(sampleBooks())} />

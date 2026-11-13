@@ -8,11 +8,10 @@ import { Colors } from '@/constants/theme';
 import { findDuplicates } from '@/library/duplicates';
 import { useLibrary } from '@/library/LibraryProvider';
 import { sampleBooks } from '@/library/sampleBooks';
-import { backupFileName, parseBackup, toBackup } from '@/services/backup';
+import { backupFileName, onlyNewBooks, parseBackup, toBackup } from '@/services/backup';
 import { readPickedText, saveJsonFile } from '@/services/files';
 import type { LayoutMode } from '@/shelf/layout';
 import { useUi } from '@/store/uiStore';
-import { bookKey } from '@/types';
 
 const LAYOUTS: { mode: LayoutMode; title: string; body: string }[] = [
   { mode: 'row', title: 'Swipe', body: 'Each group keeps to its own shelf. Swipe sideways along the long ones.' },
@@ -78,8 +77,7 @@ export default function SettingsScreen() {
     if (picked.canceled) return;
     try {
       const restored = parseBackup(await readPickedText(picked.assets[0]));
-      const known = new Set(books.map(bookKey));
-      const fresh = restored.filter((b) => !known.has(bookKey(b)));
+      const fresh = onlyNewBooks(restored, books);
       await addBooks(fresh);
       const skipped = restored.length - fresh.length;
       alert('Backup restored', `${fresh.length} added${skipped ? `, ${skipped} already on your shelves` : ''}.`);

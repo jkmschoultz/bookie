@@ -1,14 +1,30 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeInDown, FadeOut, LayoutAnimationConfig, LinearTransition, ZoomIn } from 'react-native-reanimated';
 
 import { alert } from '@/components/alert';
 import { Chip } from '@/components/Chip';
-import { Cover } from '@/components/Cover';
+import { CoverChoices } from '@/components/CoverChoices';
+import { CoverEditor } from '@/components/CoverEditor';
+import { YearPicker } from '@/components/YearPicker';
 import { Colors } from '@/constants/theme';
+import {
+  checkHeight,
+  checkIsbn,
+  checkPageCount,
+  checkSeriesIndex,
+  checkYear,
+  cleanGenre,
+  decimalOnly,
+  digitsOnly,
+  GENRE_MAX_LENGTH,
+  isbnChars,
+} from '@/library/fields';
 import { useLibrary } from '@/library/LibraryProvider';
+import { findCoverOptions } from '@/services/metadata/covers';
 import { GENRES, cleanIsbn, isbn10to13 } from '@/services/metadata/normalize';
 import { useUi } from '@/store/uiStore';
 import { emptyDraft, STATUS_LABELS, today, type Book, type BookDraft, type ReadStatus } from '@/types';
@@ -86,8 +102,9 @@ async function persistPhoto(uri: string): Promise<string> {
 }
 
 export default function BookFormScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  const { getBook, addBook, updateBook, findByIsbn } = useLibrary();
+  // `work` is the Open Library work a search result came from, for finding its other covers.
+  const { id, work } = useLocalSearchParams<{ id?: string; work?: string }>();
+  const { books, getBook, addBook, updateBook, findByIsbn } = useLibrary();
   const draft = useUi((s) => s.draft);
   const setDraft = useUi((s) => s.setDraft);
 
@@ -101,6 +118,19 @@ export default function BookFormScreen() {
 
   const set = <K extends keyof Form>(key: K) => (value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
 
+  const errors = formErrors(form);
+
+  // The usual genres, any of the reader's own from other books, and any this book already has.
+  const genreChoices = [...new Set([...GENRES, ...books.flatMap((b) => b.genres), ...form.genres])].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' }),
+  );
+  const [newGenre, setNewGenre] = useState<string | null>(null);
+  const addGenre = () => {
+    const genre = cleanGenre(newGenre ?? '', genreChoices);
+    if (genre && !form.genres.includes(genre)) set('genres')([...form.genres, genre]);
+    setNewGenre(null);
+  };
+
   const preview: Book = {
     ...fromForm(form, base),
     id: editing?.id ?? -1,
@@ -113,15 +143,42 @@ export default function BookFormScreen() {
     notes: null,
   };
 
+  // Other covers for this book (other editions), to choose from. Looked up once, from what the form started with.
+  const [found, setFound] = useState<string[]>([]);
+  const [findingCovers, setFindingCovers] = useState(() => !!(work || base.isbn13 || base.isbn10 || base.title));
+  const [uploads, setUploads] = useState<string[]>([]);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const lookup = { workKey: work, isbn: base.isbn13 ?? base.isbn10, title: base.title, author: base.authors[0] };
+    if (!lookup.workKey && !lookup.isbn && !lookup.title) return;
+    findCoverOptions(lookup, ctrl.signal).then((urls) => {
+      if (ctrl.signal.aborted) return;
+      setFound(urls);
+      setFindingCovers(false);
+    });
+    return () => ctrl.abort();
+    // Only when the screen opens: typing a new title shouldn't refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const coverOptions = [...new Set([...uploads, ...(base.coverUrl ? [base.coverUrl] : []), ...found])];
+
   const pickPhoto = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [2, 3], quality: 0.8 });
-    if (!res.canceled) set('coverUrl')(await persistPhoto(res.assets[0].uri));
+    if (res.canceled) return;
+    const photo = await persistPhoto(res.assets[0].uri);
+    setUploads((u) => [photo, ...u]);
+    set('coverUrl')(photo);
   };
 
   const save = async () => {
     const book = fromForm(form, base);
     if (!book.title) {
       alert('A title is needed');
+      return;
+    }
+    const problems = Object.values(errors).filter(Boolean);
+    if (problems.length) {
+      alert('Check the highlighted fields', problems.join('\n'));
       return;
     }
     if (editing) {
@@ -159,50 +216,87 @@ export default function BookFormScreen() {
         }}
       />
       <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.coverRow}>
-          <Cover key={form.coverUrl ?? 'none'} book={preview} width={96} />
-          <View style={{ flex: 1, gap: 8 }}>
-            <Pressable style={styles.smallButton} onPress={pickPhoto}>
-              <Text style={styles.smallButtonText}>Choose cover photo</Text>
-            </Pressable>
-            {form.coverUrl && (
-              <Pressable style={styles.smallButton} onPress={() => set('coverUrl')(null)}>
-                <Text style={styles.smallButtonText}>Remove cover</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
+        <CoverEditor
+          key={form.coverUrl ?? 'plain'}
+          book={preview}
+          width={150}
+          title={form.title}
+          authors={form.authors}
+          onChangeTitle={set('title')}
+          onChangeAuthors={set('authors')}
+        />
 
-        <Field label="Title *" value={form.title} onChange={set('title')} />
+        <Text style={styles.label}>Cover</Text>
+        <CoverChoices
+          book={preview}
+          selected={form.coverUrl}
+          options={coverOptions}
+          loading={findingCovers}
+          onChoose={set('coverUrl')}
+          onUpload={pickPhoto}
+        />
+
         <Field label="Subtitle" value={form.subtitle} onChange={set('subtitle')} />
-        <Field label="Authors (comma separated)" value={form.authors} onChange={set('authors')} />
         <View style={styles.pair}>
           <Field label="Series" value={form.series} onChange={set('series')} flex={3} />
-          <Field label="#" value={form.seriesIndex} onChange={set('seriesIndex')} numeric flex={1} />
+          <Field label="#" value={form.seriesIndex} onChange={set('seriesIndex')} filter={decimalOnly} error={errors.seriesIndex} flex={1} />
         </View>
         <View style={styles.pair}>
-          <Field label="Pages" value={form.pageCount} onChange={set('pageCount')} numeric />
-          <Field label="Year published" value={form.publishedYear} onChange={set('publishedYear')} numeric />
+          <Field label="Pages" value={form.pageCount} onChange={set('pageCount')} numeric filter={(v) => digitsOnly(v, 5)} error={errors.pageCount} />
+          <YearPicker label="Year published" value={form.publishedYear} onChange={set('publishedYear')} error={errors.publishedYear} />
         </View>
         <Field label="Publisher" value={form.publisher} onChange={set('publisher')} />
         <View style={styles.pair}>
-          <Field label="ISBN" value={form.isbn} onChange={set('isbn')} numeric flex={2} />
-          <Field label="Height (mm)" value={form.heightMm} onChange={set('heightMm')} numeric />
+          <Field label="ISBN" value={form.isbn} onChange={set('isbn')} filter={isbnChars} error={errors.isbn} flex={2} />
+          <Field label="Height (mm)" value={form.heightMm} onChange={set('heightMm')} numeric filter={(v) => digitsOnly(v, 3)} error={errors.heightMm} />
         </View>
 
         <Text style={styles.label}>Genres</Text>
-        <View style={styles.wrap}>
-          {GENRES.map((g) => (
-            <Chip
-              key={g}
-              small
-              label={g}
-              selected={form.genres.includes(g)}
-              onPress={() => set('genres')(form.genres.includes(g) ? form.genres.filter((x) => x !== g) : [...form.genres, g])}
+        {/* Chips zoom in only when added, not all at once when the form opens. */}
+        <LayoutAnimationConfig skipEntering>
+          <View style={styles.wrap}>
+            {genreChoices.map((g) => (
+              // A genre you add slides into its place in the alphabet, nudging the others along.
+              <Animated.View key={g} entering={ZoomIn.duration(220)} layout={LinearTransition.duration(220)}>
+                <Chip
+                  small
+                  label={g}
+                  selected={form.genres.includes(g)}
+                  onPress={() => set('genres')(form.genres.includes(g) ? form.genres.filter((x) => x !== g) : [...form.genres, g])}
+                />
+              </Animated.View>
+            ))}
+            {newGenre == null && (
+              <Animated.View layout={LinearTransition.duration(220)}>
+                <Chip small label="＋ New genre" selected={false} onPress={() => setNewGenre('')} />
+              </Animated.View>
+            )}
+          </View>
+        </LayoutAnimationConfig>
+        {newGenre != null && (
+          <Animated.View entering={FadeInDown.duration(200)} exiting={FadeOut.duration(120)} style={styles.genreRow}>
+            <TextInput
+              value={newGenre}
+              onChangeText={setNewGenre}
+              onSubmitEditing={addGenre}
+              placeholder="e.g. Cosy Mystery"
+              placeholderTextColor={Colors.border}
+              maxLength={GENRE_MAX_LENGTH}
+              autoFocus
+              returnKeyType="done"
+              accessibilityLabel="New genre"
+              style={[styles.input, { flex: 1 }]}
             />
-          ))}
-        </View>
-        <Text style={styles.hint}>The first genre chosen decides which shelf it sits on.</Text>
+            <Pressable style={styles.addGenre} onPress={addGenre} accessibilityRole="button">
+              <Text style={styles.addGenreText}>Add</Text>
+            </Pressable>
+          </Animated.View>
+        )}
+        <Text style={styles.hint}>
+          {form.genres.length
+            ? `Shelved under ${form.genres[0]}: the first genre chosen decides which shelf it sits on.`
+            : 'The first genre chosen decides which shelf it sits on.'}
+        </Text>
 
         <Text style={styles.label}>Spine colour</Text>
         <View style={styles.wrap}>
@@ -241,6 +335,16 @@ export default function BookFormScreen() {
   );
 }
 
+function formErrors(f: Form) {
+  return {
+    seriesIndex: checkSeriesIndex(f.seriesIndex),
+    pageCount: checkPageCount(f.pageCount),
+    publishedYear: checkYear(f.publishedYear),
+    isbn: checkIsbn(f.isbn),
+    heightMm: checkHeight(f.heightMm),
+  };
+}
+
 function confirmDuplicate(title: string): Promise<boolean> {
   return new Promise((resolve) =>
     alert('Already on your shelves', `“${title}” has the same ISBN. Add another copy?`, [
@@ -255,12 +359,18 @@ function Field({
   value,
   onChange,
   numeric,
+  filter,
+  error,
   flex = 1,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   numeric?: boolean;
+  /** Tidies what's typed, e.g. dropping anything but digits. */
+  filter?: (v: string) => string;
+  /** Shown under the field, which turns red. */
+  error?: string | null;
   flex?: number;
 }) {
   return (
@@ -268,21 +378,26 @@ function Field({
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
-        onChangeText={onChange}
-        keyboardType={numeric ? 'numbers-and-punctuation' : 'default'}
+        onChangeText={(v) => onChange(filter ? filter(v) : v)}
+        keyboardType={numeric ? 'number-pad' : 'default'}
+        accessibilityLabel={label}
         placeholderTextColor={Colors.border}
-        style={styles.input}
+        style={[styles.input, error && { borderColor: Colors.danger }]}
       />
+      {error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 12, paddingBottom: 60 },
-  coverRow: { flexDirection: 'row', gap: 16, alignItems: 'center', marginBottom: 8 },
   pair: { flexDirection: 'row', gap: 12 },
   label: { color: Colors.textMuted, fontSize: 12, fontWeight: '600', marginTop: 4 },
   hint: { color: Colors.textMuted, fontSize: 12 },
+  error: { color: Colors.danger, fontSize: 12 },
+  genreRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  addGenre: { backgroundColor: Colors.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  addGenreText: { color: Colors.accentText, fontWeight: '700' },
   input: {
     color: Colors.text,
     backgroundColor: Colors.surface,
@@ -297,8 +412,6 @@ const styles = StyleSheet.create({
   swatch: { width: 34, height: 34, borderRadius: 17, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
   swatchSelected: { borderColor: Colors.accent, borderWidth: 3 },
   auto: { color: Colors.textMuted, fontSize: 9 },
-  smallButton: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, alignSelf: 'flex-start' },
-  smallButtonText: { color: Colors.text, fontSize: 14 },
   save: { backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   saveText: { color: Colors.accentText, fontSize: 16, fontWeight: '700' },
   headerAction: { color: Colors.accent, fontSize: 16, fontWeight: '600' },

@@ -36,6 +36,11 @@ export function coverUrl(coverId: number | undefined | null, size: 'S' | 'M' | '
   return coverId && coverId > 0 ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg` : null;
 }
 
+/** Open Library's large size of a medium cover, for showing it big. Other addresses are left as they are. */
+export function largeCoverUrl(url: string | null): string | null {
+  return url?.replace(/^(https:\/\/covers\.openlibrary\.org\/b\/\w+\/[^/]+)-M\.jpg$/, '$1-L.jpg') ?? null;
+}
+
 async function getJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
   const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
   if (!res.ok) return null;

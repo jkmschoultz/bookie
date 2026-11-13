@@ -24,7 +24,7 @@ A reading tracker that shows your library as a virtual bookshelf. Swipe along sh
 
 ## Built with
 
-Expo (SDK 58), React Native and Expo Router, TypeScript, SQLite (`expo-sqlite`), Zustand and Reanimated. The shelf engine in `src/shelf/` is plain TypeScript with unit tests (Jest). Pull requests are checked by GitHub Actions, which also deploys to EAS Hosting.
+Expo (SDK 58), React Native and Expo Router, TypeScript, SQLite (`expo-sqlite`), Zustand and Reanimated. The shelf engine in `src/shelf/` is plain TypeScript with unit tests (Jest). Pull requests are checked by GitHub Actions, which also deploys to Cloudflare Pages (and, while people move over, to the old address on EAS Hosting).
 
 All data stays on the device in SQLite, so use Settings → Export backup to keep a copy. It runs in **Expo Go** (once the SDK 58 Expo Go is out on the stores; until then use a development build) and on the **web**.
 
@@ -52,6 +52,20 @@ npm run deploy:web      # expo export --platform web, then eas deploy --prod (EA
 
 The first deploy asks you to log in to Expo and pick a subdomain. `public/` holds the web shell: `index.html` (manifest and iOS home-screen tags), `manifest.json` and the home-screen icons. On web, only use SQLite's async API (`getAllAsync`, `runAsync`, kv-store `getItem`…): the sync calls need `SharedArrayBuffer`, which needs the cross-origin isolation headers in the `expo-router` plugin in `app.json`. `expo start` sends those headers but EAS Hosting doesn't for this static build, so sync calls would work locally and fail on the live site.
 
+### Moving to a new address
+
+A library lives in the browser, tied to the address it was saved at, so it can't follow people to a new address by itself. To move:
+
+1. Deploy the same build to the new address. Its `/move-in` screen receives libraries.
+2. Set the `BOOKIE_NEW_URL` repository variable (Settings → Secrets and variables → Actions → Variables) to the new address, e.g. `https://bookie.example.com`, and deploy to production again.
+3. `bookie.expo.app` now shows a "Bookie has moved" banner. **Move my books** opens the new address in a new window and hands the library across with `postMessage` (the same JSON as Export backup, plus the shelf layout). Books already there are skipped and nothing at the old address is deleted, so keep it running for a while.
+
+Each side only accepts messages from the other's exact origin (`src/library/move.ts`). Don't send `Cross-Origin-Opener-Policy` from the new address: it cuts the new window off from the old one. Bookie can only open its library in one tab per address, so the move fails if the new address is already open in another tab; the banner says so. Home-screen icons keep opening the old address, and the new site's move-in screen explains how to add the new one.
+
+For Cloudflare Pages, build with `npm run export:cloudflare`, not a plain `expo export`. `wrangler pages deploy` never uploads files inside a `node_modules` folder, and Expo puts package assets (including SQLite's `wa-sqlite.wasm`) under `dist/assets/node_modules/`. Without them the library can't open. `scripts/prepare-cloudflare.mjs` moves them to `assets/vendor/` and adds a `_redirects` rewrite.
+
+To try it without touching production, build with `EXPO_PUBLIC_OLD_URL=https://bookie--staging.expo.app`, deploy one build with no alias (the "new" site), then build again with `EXPO_PUBLIC_NEW_URL` set to that deploy's address and `eas deploy --alias staging`.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request into `master` (and on pushes to it):
@@ -59,14 +73,17 @@ The first deploy asks you to log in to Expo and pick a subdomain. `public/` hold
 1. **Tests**: the unit tests. Required to merge.
 2. **Build**: the same web export the deploy uses. Required to merge.
 3. **Typecheck & lint**: advisory. A failure shows as a red cross on the PR but doesn't have to block merging.
-4. **Preview deploy**: after Build, deploys that build to an unnamed EAS Hosting address and posts it on the PR. It's a separate, empty library from the live app, and Expo deletes it after 30 days. It doesn't use one of the 5 named aliases.
+4. **Preview deploy**: after Build, deploys that build to Cloudflare Pages under the PR's branch name (`<branch>.mybookie.pages.dev`, the same address for every push to the PR) and posts it on the PR. It's a separate, empty library from the live app.
 
-5. **Deploy to production**: only on pushes to `master` (a merged PR or a direct push). Waits for Tests and Build, then deploys that build with `eas deploy --prod`. Typecheck & lint doesn't hold it up.
+5. **Deploy to production**: only on pushes to `master` (a merged PR or a direct push). Waits for Tests and Build, then deploys that build to Cloudflare Pages production (`mybookie.pages.dev`), and to the old address with `eas deploy --prod` so people who haven't moved their library yet still get each release. Typecheck & lint doesn't hold it up.
 
-On a PR, the first four run in parallel. `npm run deploy:web` still works for deploying by hand. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
+On a PR, the first four run in parallel. `npm run deploy:cloudflare` (and `npm run deploy:web` for the old address) still work for deploying by hand. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
 
-- `EXPO_TOKEN` (needed for previews and the production deploy): create one at expo.dev → Account settings → Access tokens. Without it those jobs just skip.
-- `GOOGLE_BOOKS_API_KEY` (optional): the same value as in `.env.local`, so preview builds match the live app.
+- `CLOUDFLARE_API_TOKEN` secret (needed for previews and the production deploy): create one at dash.cloudflare.com → My Profile → API Tokens → Create Token → Custom token, with the permission Account → Cloudflare Pages → Edit, for your account. Without it those jobs skip their Cloudflare steps.
+- `CLOUDFLARE_ACCOUNT_ID` variable (Variables tab): your account ID, shown in the Cloudflare dashboard (Workers & Pages → Overview, on the right) or in the address bar after `dash.cloudflare.com/`.
+- `EXPO_TOKEN` secret (keeps the old address updated): create one at expo.dev → Account settings → Access tokens. Without it the old address keeps its last deploy.
+- `BOOKIE_NEW_URL` variable: `https://mybookie.pages.dev`. Set it once the Cloudflare site is live: from the next production deploy, the old address shows the "Bookie has moved" banner (see Moving to a new address).
+- `GOOGLE_BOOKS_API_KEY` secret (optional): the same value as in `.env.local`, so preview builds match the live app.
 
 To block merging until the right checks pass: Settings → Branches (or Rules → Rulesets) → protect `master` → require a pull request and require the **Tests** and **Build** status checks. Leave **Typecheck & lint** (and **Preview deploy**) off that list to keep them optional. Check names come from each job's `name:` in the workflow, and a check only appears in the list after it has run once.
 
