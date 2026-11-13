@@ -62,6 +62,8 @@ A library lives in the browser, tied to the address it was saved at, so it can't
 
 Each side only accepts messages from the other's exact origin (`src/library/move.ts`). Don't send `Cross-Origin-Opener-Policy` from the new address: it cuts the new window off from the old one. Bookie can only open its library in one tab per address, so the move fails if the new address is already open in another tab; the banner says so. Home-screen icons keep opening the old address, and the new site's move-in screen explains how to add the new one.
 
+For Cloudflare Pages, build with `npm run export:cloudflare`, not a plain `expo export`. `wrangler pages deploy` never uploads files inside a `node_modules` folder, and Expo puts package assets (including SQLite's `wa-sqlite.wasm`) under `dist/assets/node_modules/`. Without them the library can't open. `scripts/prepare-cloudflare.mjs` moves them to `assets/vendor/` and adds a `_redirects` rewrite.
+
 To try it without touching production, build with `EXPO_PUBLIC_OLD_URL=https://bookie--staging.expo.app`, deploy one build with no alias (the "new" site), then build again with `EXPO_PUBLIC_NEW_URL` set to that deploy's address and `eas deploy --alias staging`.
 
 ## Continuous integration

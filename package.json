@@ -57,7 +57,8 @@
     "lint": "expo lint",
     "test": "jest",
     "deploy:web": "expo export --platform web && npx eas-cli@latest deploy --prod",
-    "deploy:staging": "expo export --platform web && npx eas-cli@latest deploy --alias staging"
+    "deploy:staging": "expo export --platform web && npx eas-cli@latest deploy --alias staging",
+    "export:cloudflare": "expo export --platform web && node scripts/prepare-cloudflare.mjs"
   },
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
