@@ -6,16 +6,16 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { alert } from '@/components/alert';
 import { BringBooksNote } from '@/components/BringBooksNote';
 import { MovedBanner } from '@/components/MovedBanner';
 import { QuickActions } from '@/components/QuickActions';
 import { SortBar } from '@/components/SortBar';
 import { Bookcase } from '@/components/shelf/Bookcase';
+import { TOUR_STEPS, inBrowserTab } from '@/components/tourSteps';
 import { Colors, Fonts } from '@/constants/theme';
 import { PULL_OUT_MS, useBookFlight, type SpineRect } from '@/library/bookFlight';
 import { useLibrary } from '@/library/LibraryProvider';
-import { markOnboardingSeen, tourStatus } from '@/library/onboarding';
+import { markOnboardingSeen, seenTourVersion, tourSteps } from '@/library/onboarding';
 import { sampleBooks } from '@/library/sampleBooks';
 import { filterBooks } from '@/shelf/filter';
 import { useUi } from '@/store/uiStore';
@@ -30,15 +30,12 @@ export default function BookshelfScreen() {
   useEffect(() => {
     if (!loaded) return;
     SplashScreen.hideAsync();
-    tourStatus().then(async (status) => {
-      if (status === 'new') router.push('/welcome');
-      else if (status === 'updated') {
-        // Asked once per tour version, whichever way they answer.
+    seenTourVersion().then(async (seen) => {
+      if (seen == null) router.push('/welcome');
+      else if (tourSteps(TOUR_STEPS, seen, { web: inBrowserTab() }).length) {
+        // Shown once per tour version, however far they get through it.
         await markOnboardingSeen();
-        alert('Psst, Bookie has been updated', 'The welcome tour has new things in it, like how book sizes and bookmarks work. Want a look?', [
-          { text: 'Not now', style: 'cancel' },
-          { text: 'Show me', onPress: () => router.push('/welcome') },
-        ]);
+        router.push({ pathname: '/welcome', params: { since: String(seen) } });
       }
     });
   }, [loaded]);
