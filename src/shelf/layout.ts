@@ -3,7 +3,7 @@ import type { Book } from '@/types';
 import type { ShelfGroup } from './grouping';
 import { hashUnit } from './hash';
 import { markerReach } from './spineCues';
-import { getSpineStyle, type SpineStyle } from './spineStyle';
+import { getSpineStyle, zoomSpineStyle, type SpineStyle } from './spineStyle';
 import { textWidth } from './textWidth';
 
 export type LayoutMode = 'row' | 'wrap';
@@ -65,10 +65,11 @@ export interface LayoutOptions {
   mode: LayoutMode;
   /** Usable shelf width in px (only used in wrap mode). */
   shelfWidth: number;
-  /** Gap between items on a shelf. */
+  /** Gap between items on a shelf, in px as drawn. */
   gap?: number;
-  scale?: number;
-  /** Books lying flat may not be taller than this. */
+  /** How much bigger than normal everything on the shelf is drawn (see shelfZoom): books, bookends, piles and plates. */
+  zoom?: number;
+  /** Books lying flat may not be taller than this, in px as drawn. */
   maxStackHeight?: number;
 }
 
@@ -82,9 +83,9 @@ const LABEL_PADDING = 8;
 const LABEL_SPACING = 6;
 
 /** Width of a group's brass label plate ("Fantasy  9"), matching the plate styles in ShelfRow. */
-export function labelPlateWidth(label: string, count: number): number {
+export function labelPlateWidth(label: string, count: number, zoom = 1): number {
   const text = textWidth(`${label}  ${count}`, LABEL_FONT_SIZE, { letterSpacing: LABEL_LETTER_SPACING });
-  return Math.ceil(Math.min(LABEL_MAX_WIDTH, text + 2 * LABEL_PADDING) + LABEL_SPACING);
+  return Math.ceil(Math.min(LABEL_MAX_WIDTH, text + 2 * LABEL_PADDING) + LABEL_SPACING) * zoom;
 }
 const STACK_CHANCE = 0.4;
 const STACK_MIN_GROUP = 5;
@@ -107,8 +108,8 @@ function stackSize(group: ShelfGroup, styles: SpineStyle[], maxHeight: number): 
   return n >= 2 ? n : 0;
 }
 
-function itemsForGroup(group: ShelfGroup, scale: number, maxStackHeight: number): ShelfItem[] {
-  const styles = group.books.map((b) => getSpineStyle(b, scale));
+function itemsForGroup(group: ShelfGroup, zoom: number, maxStackHeight: number): ShelfItem[] {
+  const styles = group.books.map((b) => zoomSpineStyle(getSpineStyle(b), zoom));
   const stacked = stackSize(group, styles, maxStackHeight);
   const upright = group.books.length - stacked;
 
@@ -125,12 +126,12 @@ function itemsForGroup(group: ShelfGroup, scale: number, maxStackHeight: number)
       .sort((a, b) => b.style.height - a.style.height);
     // Lying books' tops face the book before the pile, so their markers need a gap there instead of poking into it.
     const reach = Math.max(...books.map((b) => markerReach(b.book)));
-    const markerRoom = reach && reach + MARKER_GAP;
+    const markerRoom = reach && (reach + MARKER_GAP) * zoom;
     items.push({
       kind: 'stack',
       key: `s${books.map((b) => b.book.id).join('-')}`,
       books,
-      width: Math.max(...books.map((b) => b.style.height)) + STACK_JITTER + markerRoom,
+      width: Math.max(...books.map((b) => b.style.height)) + STACK_JITTER * zoom + markerRoom,
       height: books.reduce((h, b) => h + b.style.width, 0),
       markerRoom,
     });
@@ -151,8 +152,9 @@ function rowWidth(items: ShelfItem[], gap: number): number {
  */
 export function layoutShelves(groups: ShelfGroup[], opts: LayoutOptions): ShelfRow[] {
   const gap = opts.gap ?? 1;
-  const scale = opts.scale ?? 1;
-  const maxStackHeight = opts.maxStackHeight ?? 110 * scale;
+  const zoom = opts.zoom ?? 1;
+  const maxStackHeight = opts.maxStackHeight ?? 110 * zoom;
+  const bookendWidth = BOOKEND_WIDTH * zoom;
   const rows: ShelfRow[] = [];
 
   let items: ShelfItem[] = [];
@@ -173,22 +175,22 @@ export function layoutShelves(groups: ShelfGroup[], opts: LayoutOptions): ShelfR
   /** Space still needed after a bookend so the previous group's plate ends before the next one starts. */
   const plateRoom = () => {
     const prev = labels.at(-1);
-    return prev ? Math.max(0, prev.x + prev.width - (width + gap + BOOKEND_WIDTH + gap)) : 0;
+    return prev ? Math.max(0, prev.x + prev.width - (width + gap + bookendWidth + gap)) : 0;
   };
   /** Whether a new group, whose first stretch is `first` wide, can still start on this shelf. */
-  const groupFits = (first: number, plate: number) => fits(BOOKEND_WIDTH + gap + plateRoom() + Math.max(first, plate));
+  const groupFits = (first: number, plate: number) => fits(bookendWidth + gap + plateRoom() + Math.max(first, plate));
   const startGroup = (group: ShelfGroup, plate: number) => {
     if (items.length) {
       const room = plateRoom();
-      place({ kind: 'bookend', key: `end:${group.key}`, width: BOOKEND_WIDTH });
+      place({ kind: 'bookend', key: `end:${group.key}`, width: bookendWidth });
       if (room > 0) place({ kind: 'space', key: `space:${group.key}`, width: room });
     }
     labels.push({ groupKey: group.key, label: group.label, count: group.books.length, x: width + (items.length ? gap : 0), width: plate });
   };
 
   for (const group of groups) {
-    const groupItems = itemsForGroup(group, scale, maxStackHeight);
-    const plate = labelPlateWidth(group.label, group.books.length);
+    const groupItems = itemsForGroup(group, zoom, maxStackHeight);
+    const plate = labelPlateWidth(group.label, group.books.length, zoom);
 
     if (opts.mode === 'row') {
       const groupWidth = rowWidth(groupItems, gap);

@@ -112,6 +112,9 @@ function FlyingBook({ flight }: { flight: Flight }) {
     : { x: cover!.x - style.width, y: cover!.y, width: style.width, height: style.height };
   const to: Rect = cover ?? { x: from.x + from.width, y: from.y, width: coverWidth, height: from.height };
   const baseScale = from.height / style.height;
+  // A bigger-drawn bookcase pulls its books out further too.
+  const lift = PULL_LIFT * style.zoom;
+  const slide = PULL_SLIDE * style.zoom;
 
   const book3d = useAnimatedStyle(() => {
     const f = flightFrame(from, to, p.value);
@@ -121,8 +124,8 @@ function FlyingBook({ flight }: { flight: Flight }) {
     const tilt = lying ? lyingTilt(p.value) : 0;
     const shift = tiltShift({ width: style.width * scale, height: style.height * scale }, tilt);
     return {
-      left: f.hingeX + (lying ? PULL_SLIDE * pull : 0),
-      top: f.top - (lying ? 0 : PULL_LIFT * pull),
+      left: f.hingeX + (lying ? slide * pull : 0),
+      top: f.top - (lying ? 0 : lift * pull),
       opacity: fade.value,
       transform: [{ translateX: shift.x }, { translateY: shift.y }, { rotate: `${tilt}deg` }, { scale }],
     };

@@ -8,6 +8,7 @@ import { registerSpine, useBookFlight, type Rect, type SpineRect } from '@/libra
 import { creases, ghostColors, GHOST_FILL, MARKER_REACH, spineCues } from '@/shelf/spineCues';
 import { DECORATION, type SpineStyle } from '@/shelf/spineStyle';
 import { LINE_HEIGHT } from '@/shelf/spineText';
+import { byZoom } from '@/shelf/zoom';
 import type { Book } from '@/types';
 
 interface Props {
@@ -28,28 +29,30 @@ const CREASE_WIDTH = 1;
 
 /** Spine ornaments. The text is set clear of them (see TEXT_INSETS in spineStyle), and the label box wraps the title. */
 function Decoration({ s }: { s: SpineStyle }) {
+  const z = s.zoom;
+  const styles = stylesFor(z);
   const band = { backgroundColor: s.accentColor, left: 0, right: 0, position: 'absolute' as const };
   const { bands } = DECORATION;
   switch (s.decoration) {
     case 'bands':
       return (
         <>
-          <View style={[band, { top: bands.outer, height: 2 }]} />
-          <View style={[band, { top: bands.inner, height: 1 }]} />
-          <View style={[band, { bottom: bands.inner, height: 1 }]} />
-          <View style={[band, { bottom: bands.outer, height: 2 }]} />
+          <View style={[band, { top: bands.outer * z, height: 2 * z }]} />
+          <View style={[band, { top: bands.inner * z, height: z }]} />
+          <View style={[band, { bottom: bands.inner * z, height: z }]} />
+          <View style={[band, { bottom: bands.outer * z, height: 2 * z }]} />
         </>
       );
     case 'band':
-      return <View style={[band, { top: DECORATION.band.top, height: DECORATION.band.height, opacity: 0.85 }]} />;
+      return <View style={[band, { top: DECORATION.band.top * z, height: DECORATION.band.height * z, opacity: 0.85 }]} />;
     case 'label': {
-      const pad = DECORATION.labelPad;
+      const pad = DECORATION.labelPad * z;
       const top = s.text.start - pad;
       const height = Math.min(s.text.titleLength + 2 * pad, s.height - top - s.text.end + pad);
       return <View style={[styles.label, { top, height, borderColor: s.accentColor }]} />;
     }
     case 'frame':
-      return <View style={[styles.frame, { top: DECORATION.frame, bottom: DECORATION.frame, borderColor: s.accentColor }]} />;
+      return <View style={[styles.frame, { top: DECORATION.frame * z, bottom: DECORATION.frame * z, borderColor: s.accentColor }]} />;
     default:
       return null;
   }
@@ -57,7 +60,8 @@ function Decoration({ s }: { s: SpineStyle }) {
 
 /** How a spine looks: colour, ornaments, shading, its upright title and its status cue. Also drawn tipped over in a pile, and by the book flying to its page. */
 export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle }) {
-  const { text } = s;
+  const { text, zoom } = s;
+  const styles = stylesFor(zoom);
   const cues = spineCues(book);
   const ghost = cues.ghost ? ghostColors(s.color) : null;
   // The text runs between its insets, which differ per decoration (e.g. more room below a band at the top).
@@ -70,7 +74,7 @@ export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle })
           <Decoration s={s} />
           <LinearGradient colors={SHADING} locations={SHADING_STOPS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         </View>
-        {cues.creases && <Creases book={book} width={s.width} height={s.height} />}
+        {cues.creases && <Creases book={book} style={s} />}
         {cues.sheen && (
           <LinearGradient colors={SHEEN} locations={SHEEN_STOPS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         )}
@@ -97,7 +101,7 @@ export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle })
               textAlign: text.lines.length > 1 ? 'center' : 'left',
               fontFamily: s.font === 'serif' ? Fonts.serif : Fonts.sans,
               fontWeight: s.font === 'sans' ? '700' : '600',
-              letterSpacing: s.uppercase ? 0.8 : 0.2,
+              letterSpacing: (s.uppercase ? 0.8 : 0.2) * zoom,
             }}>
             {text.lines.join('\n')}
           </Text>
@@ -122,13 +126,18 @@ export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle })
  * A read book's spine creases: pale lines where the ink cracked off the cover, each with a faint shadow along one side,
  * fading out where the crease starts, stops or breaks off. Each piece is a thin line turned to join its two ends.
  */
-function Creases({ book, width, height }: { book: Book; width: number; height: number }) {
+function Creases({ book, style: s }: { book: Book; style: SpineStyle }) {
+  const z = s.zoom;
+  const styles = stylesFor(z);
+  // Placed on the spine at its normal size, then drawn bigger, so a zoomed spine has the very same creases.
   return (
     <>
-      {creases(book.id, width, height).flatMap((crease, i) =>
-        crease.map(({ x1, y1, x2, y2, strength, fadeStart, fadeEnd }, j) => {
+      {creases(book.id, s.width / z, s.height / z).flatMap((crease, i) =>
+        crease.map((piece, j) => {
+          const { strength, fadeStart, fadeEnd } = piece;
+          const [x1, y1, x2, y2] = [piece.x1 * z, piece.y1 * z, piece.x2 * z, piece.y2 * z];
           const length = Math.hypot(x2 - x1, y2 - y1);
-          const fade = Math.min(0.35, 10 / length);
+          const fade = Math.min(0.35, (10 * z) / length);
           return (
             <LinearGradient
               key={`${i}-${j}`}
@@ -137,7 +146,7 @@ function Creases({ book, width, height }: { book: Book; width: number; height: n
               style={[
                 styles.crease,
                 {
-                  left: (x1 + x2) / 2 - CREASE_WIDTH / 2,
+                  left: (x1 + x2) / 2 - (CREASE_WIDTH * z) / 2,
                   top: (y1 + y2) / 2 - length / 2,
                   height: length,
                   opacity: strength,
@@ -156,8 +165,9 @@ function Creases({ book, width, height }: { book: Book; width: number; height: n
 function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
   const ref = useRef<ComponentRef<typeof View>>(null);
   const lift = useSharedValue(0);
+  const liftBy = 14 * s.zoom;
   const animated = useAnimatedStyle(() => ({
-    transform: [{ translateY: -14 * lift.value }, { scale: 1 + 0.04 * lift.value }],
+    transform: [{ translateY: -liftBy * lift.value }, { scale: 1 + 0.04 * lift.value }],
     zIndex: lift.value > 0 ? 10 : 0,
   }));
   // While this book is flying to or from its page it isn't on the shelf.
@@ -208,86 +218,88 @@ function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
 
 export const Spine = memo(SpineComponent);
 
-const styles = StyleSheet.create({
-  spine: {
-    flex: 1,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-    overflow: 'hidden',
-  },
-  textRow: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    transform: [{ rotate: '90deg' }],
-  },
-  author: {
-    flexShrink: 0,
-    opacity: 0.85,
-    fontStyle: 'italic',
-  },
-  label: {
-    position: 'absolute',
-    left: 3,
-    right: 3,
-    borderWidth: 1,
-    borderRadius: 1,
-    backgroundColor: 'rgba(255,248,230,0.12)',
-  },
-  frame: {
-    position: 'absolute',
-    left: 3,
-    right: 3,
-    borderWidth: StyleSheet.hairlineWidth * 2,
-  },
-  crease: {
-    position: 'absolute',
-    width: CREASE_WIDTH,
-  },
-  creaseShadow: {
-    position: 'absolute',
-    left: CREASE_WIDTH,
-    width: 1,
-    backgroundColor: 'rgba(0,0,0,0.16)',
-  },
-  ghostOutline: {
-    ...StyleSheet.absoluteFill,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderRadius: 2,
-  },
-  bookmark: {
-    position: 'absolute',
-    top: -MARKER_REACH.ribbon,
-    right: '18%',
-    width: 6,
-    height: 16,
-    backgroundColor: Colors.ribbon,
-    borderTopLeftRadius: 1,
-    borderTopRightRadius: 1,
-    zIndex: -1,
-  },
-  tab: {
-    position: 'absolute',
-    top: -MARKER_REACH.tab,
-    left: '20%',
-    width: 8,
-    height: 12,
-    backgroundColor: Colors.tab,
-    borderTopLeftRadius: 1,
-    borderTopRightRadius: 1,
-    zIndex: -1,
-  },
-  slip: {
-    position: 'absolute',
-    top: -MARKER_REACH.slip + 2,
-    left: '24%',
-    width: 7,
-    height: 22,
-    backgroundColor: Colors.paper,
-    transform: [{ rotate: '-14deg' }],
-    zIndex: -1,
-  },
-});
+const stylesFor = byZoom((z) =>
+  StyleSheet.create({
+    spine: {
+      flex: 1,
+      borderTopLeftRadius: 2 * z,
+      borderTopRightRadius: 2 * z,
+      overflow: 'hidden',
+    },
+    textRow: {
+      position: 'absolute',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8 * z,
+      transform: [{ rotate: '90deg' }],
+    },
+    author: {
+      flexShrink: 0,
+      opacity: 0.85,
+      fontStyle: 'italic',
+    },
+    label: {
+      position: 'absolute',
+      left: 3 * z,
+      right: 3 * z,
+      borderWidth: z,
+      borderRadius: z,
+      backgroundColor: 'rgba(255,248,230,0.12)',
+    },
+    frame: {
+      position: 'absolute',
+      left: 3 * z,
+      right: 3 * z,
+      borderWidth: StyleSheet.hairlineWidth * 2 * z,
+    },
+    crease: {
+      position: 'absolute',
+      width: CREASE_WIDTH * z,
+    },
+    creaseShadow: {
+      position: 'absolute',
+      left: CREASE_WIDTH * z,
+      width: z,
+      backgroundColor: 'rgba(0,0,0,0.16)',
+    },
+    ghostOutline: {
+      ...StyleSheet.absoluteFill,
+      borderWidth: 1.5 * z,
+      borderStyle: 'dashed',
+      borderRadius: 2 * z,
+    },
+    bookmark: {
+      position: 'absolute',
+      top: -MARKER_REACH.ribbon * z,
+      right: '18%',
+      width: 6 * z,
+      height: 16 * z,
+      backgroundColor: Colors.ribbon,
+      borderTopLeftRadius: z,
+      borderTopRightRadius: z,
+      zIndex: -1,
+    },
+    tab: {
+      position: 'absolute',
+      top: -MARKER_REACH.tab * z,
+      left: '20%',
+      width: 8 * z,
+      height: 12 * z,
+      backgroundColor: Colors.tab,
+      borderTopLeftRadius: z,
+      borderTopRightRadius: z,
+      zIndex: -1,
+    },
+    slip: {
+      position: 'absolute',
+      top: (-MARKER_REACH.slip + 2) * z,
+      left: '24%',
+      width: 7 * z,
+      height: 22 * z,
+      backgroundColor: Colors.paper,
+      transform: [{ rotate: '-14deg' }],
+      zIndex: -1,
+    },
+  }),
+);

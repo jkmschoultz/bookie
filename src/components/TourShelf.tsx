@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Spine } from '@/components/shelf/Spine';
-import { Shelf, Wood } from '@/constants/theme';
+import { Colors, Shelf, Wood } from '@/constants/theme';
 import { getSpineStyle } from '@/shelf/spineStyle';
 import { emptyDraft, type Book, type ReadStatus } from '@/types';
 
@@ -43,6 +43,8 @@ export interface TourSlot {
   books: Book[];
   /** Printed on the brass plate under the books. */
   caption: string;
+  /** A word or two under the shelf about what to look for. */
+  note?: string;
 }
 
 /** A little shelf for the welcome tour, drawn with the real spines so it always matches how the app draws a book. */
@@ -51,7 +53,7 @@ export function TourShelf({ slots, label, height = 196 }: { slots: TourSlot[]; l
     <View style={styles.shelf} pointerEvents="none" accessible accessibilityLabel={label}>
       <LinearGradient colors={Wood.backPanel} style={StyleSheet.absoluteFill} />
       {slots.map((slot) => (
-        <View key={slot.caption} style={styles.slot}>
+        <View key={`${slot.caption}|${slot.note}`} style={styles.slot}>
           <View style={[styles.books, { height }]}>
             {slot.books.map((book) => (
               <Spine key={book.id} book={book} style={getSpineStyle(book)} onOpen={noop} onLongPress={noop} />
@@ -63,6 +65,7 @@ export function TourShelf({ slots, label, height = 196 }: { slots: TourSlot[]; l
               <Text style={styles.plateText}>{slot.caption}</Text>
             </LinearGradient>
           </LinearGradient>
+          {slot.note && <Text style={styles.note}>{slot.note}</Text>}
         </View>
       ))}
     </View>
@@ -75,5 +78,6 @@ const styles = StyleSheet.create({
   books: { alignItems: 'flex-end', justifyContent: 'center', flexDirection: 'row' },
   plankFront: { height: Shelf.plankFront + 6, alignItems: 'center', justifyContent: 'center' },
   plate: { paddingHorizontal: 8, paddingVertical: 1, borderRadius: 2 },
+  note: { color: Colors.textMuted, fontSize: 11, textAlign: 'center', paddingVertical: 5, paddingHorizontal: 2 },
   plateText: { color: Wood.brassText, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
 });

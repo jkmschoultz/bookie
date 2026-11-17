@@ -12,10 +12,11 @@ import { MovedBanner } from '@/components/MovedBanner';
 import { QuickActions } from '@/components/QuickActions';
 import { SortBar } from '@/components/SortBar';
 import { Bookcase } from '@/components/shelf/Bookcase';
+import { TOUR_STEPS, inBrowserTab } from '@/components/tourSteps';
 import { Colors, Fonts } from '@/constants/theme';
 import { PULL_OUT_MS, useBookFlight, type SpineRect } from '@/library/bookFlight';
 import { useLibrary } from '@/library/LibraryProvider';
-import { markOnboardingSeen, tourStatus } from '@/library/onboarding';
+import { markOnboardingSeen, seenTourVersion, tourSteps, whatsNewMessage } from '@/library/onboarding';
 import { sampleBooks } from '@/library/sampleBooks';
 import { filterBooks } from '@/shelf/filter';
 import { useUi } from '@/store/uiStore';
@@ -30,14 +31,16 @@ export default function BookshelfScreen() {
   useEffect(() => {
     if (!loaded) return;
     SplashScreen.hideAsync();
-    tourStatus().then(async (status) => {
-      if (status === 'new') router.push('/welcome');
-      else if (status === 'updated') {
+    seenTourVersion().then(async (seen) => {
+      if (seen == null) router.push('/welcome');
+      else {
+        const fresh = tourSteps(TOUR_STEPS, seen, { web: inBrowserTab() });
+        if (!fresh.length) return;
         // Asked once per tour version, whichever way they answer.
         await markOnboardingSeen();
-        alert('Psst, Bookie has been updated', 'The welcome tour has new things in it, like how book sizes and bookmarks work. Want a look?', [
+        alert('Psst, Bookie has been updated', whatsNewMessage(fresh.map((s) => s.title)), [
           { text: 'Not now', style: 'cancel' },
-          { text: 'Show me', onPress: () => router.push('/welcome') },
+          { text: 'Show me', onPress: () => router.push({ pathname: '/welcome', params: { since: String(seen) } }) },
         ]);
       }
     });

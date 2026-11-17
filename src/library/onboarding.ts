@@ -4,21 +4,42 @@ const SEEN_KEY = 'onboarding.seen';
 const VERSION_KEY = 'onboarding.version';
 
 /**
- * Bump this when the welcome tour gains something worth telling people who've already seen it. Anyone on an older
- * version is offered the new tour once (see `tourStatus`). Version 1 is the original tour, which didn't record a version.
+ * Bump this when the welcome tour gains something worth telling people who've already seen it, and give the new or
+ * changed steps this version as their `since`. Anyone on an older version is offered just those steps, once, as
+ * "What's new" (see `tourSteps`). Version 1 is the original tour, which didn't record a version.
  */
-export const TOUR_VERSION = 3;
+export const TOUR_VERSION = 4;
 
-/** `new`: never seen the tour. `updated`: saw an older one. `current`: nothing to say. */
-export type TourStatus = 'new' | 'updated' | 'current';
-
-export async function tourStatus(): Promise<TourStatus> {
-  if ((await Storage.getItem(SEEN_KEY)) == null) return 'new';
-  const seen = Number(await Storage.getItem(VERSION_KEY)) || 1;
-  return seen < TOUR_VERSION ? 'updated' : 'current';
+/** What `tourSteps` needs to know about a step of the tour. */
+export interface TourStepInfo {
+  /** The tour version that added this step, or last changed it enough to show again. */
+  since: number;
+  /** Only worth showing in a browser tab: the installed app is already an app. */
+  webOnly?: boolean;
 }
 
-/** Records that the tour (this version of it) has been finished, skipped, or offered. */
+/**
+ * The steps of the tour someone should see: all of them if they've never seen it (`seenVersion` null), and otherwise
+ * only those added or changed since the version they saw, which is none once they're up to date. Browser-only steps
+ * are left out when `web` is false.
+ */
+export function tourSteps<T extends TourStepInfo>(steps: readonly T[], seenVersion: number | null, { web }: { web: boolean }): T[] {
+  return steps.filter((s) => (web || !s.webOnly) && (seenVersion == null || s.since > seenVersion));
+}
+
+/** What the "Psst" alert tells a returning user about the tour steps that are new to them, given their titles. */
+export function whatsNewMessage(titles: readonly string[]): string {
+  if (titles.length === 1) return `There's something new: ${titles[0].charAt(0).toLowerCase()}${titles[0].slice(1)}. Want a look?`;
+  return `The welcome tour has ${titles.length} new things in it. Want a look?`;
+}
+
+/** The tour version last seen on this device, or null if the tour has never been seen. */
+export async function seenTourVersion(): Promise<number | null> {
+  if ((await Storage.getItem(SEEN_KEY)) == null) return null;
+  return Number(await Storage.getItem(VERSION_KEY)) || 1;
+}
+
+/** Records that the tour (this version of it) has been finished, skipped, or shown. */
 export async function markOnboardingSeen(): Promise<void> {
   await Storage.setItem(SEEN_KEY, new Date().toISOString());
   await Storage.setItem(VERSION_KEY, String(TOUR_VERSION));

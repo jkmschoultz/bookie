@@ -1,7 +1,7 @@
 import { makeBook } from '@/test/makeBook';
 
 import type { ShelfGroup } from '../grouping';
-import { LABEL_MAX_WIDTH, labelPlateWidth, layoutShelves } from '../layout';
+import { BOOKEND_WIDTH, LABEL_MAX_WIDTH, labelPlateWidth, layoutShelves } from '../layout';
 import { MARKER_REACH } from '../spineCues';
 
 function group(key: string, n: number, pages = 300): ShelfGroup {
@@ -110,4 +110,36 @@ describe('label plates', () => {
     expect(labelPlateWidth('Biography & Memoir', 12)).toBeGreaterThan(labelPlateWidth('Poetry', 1));
     expect(labelPlateWidth('x'.repeat(200), 1)).toBe(LABEL_MAX_WIDTH + 6);
   });
+});
+
+describe('zoomed in', () => {
+  const groups = [...Array.from({ length: 12 }, (_, i) => group(`g${i}`, 8 + i)), group('short', 2), group('Biography & Memoir', 1)];
+  const marked = groups.map((g) => ({ ...g, books: g.books.map((b, i) => ({ ...b, status: i % 2 ? ('reading' as const) : ('dnf' as const) })) }));
+
+  for (const mode of ['row', 'wrap'] as const) {
+    it(`lays out a ${mode} bookcase 1.5 times as big exactly as the normal one, every size scaled`, () => {
+      const normal = layoutShelves(marked, { mode, shelfWidth: 360, gap: 1 });
+      const big = layoutShelves(marked, { mode, shelfWidth: 540, gap: 1.5, zoom: 1.5 });
+      // The same books on the same shelves, in the same places.
+      expect(big.map((r) => r.items.map((i) => i.key))).toEqual(normal.map((r) => r.items.map((i) => i.key)));
+      big.forEach((row, r) => {
+        expect(row.width).toBeCloseTo(normal[r].width * 1.5);
+        row.labels.forEach((l, i) => {
+          expect(l.x).toBeCloseTo(normal[r].labels[i].x * 1.5);
+          expect(l.width).toBeCloseTo(normal[r].labels[i].width * 1.5);
+        });
+        row.items.forEach((it, i) => {
+          const n = normal[r].items[i];
+          expect(it.width).toBeCloseTo(n.width * 1.5);
+          if (it.kind === 'bookend') expect(it.width).toBe(BOOKEND_WIDTH * 1.5);
+          if (it.kind === 'spine' && n.kind === 'spine') expect(it.style.zoom).toBe(1.5);
+          if (it.kind === 'stack' && n.kind === 'stack') {
+            expect(it.height).toBeCloseTo(n.height * 1.5);
+            expect(it.markerRoom).toBeCloseTo(n.markerRoom * 1.5);
+          }
+        });
+      });
+      expect(big.flatMap((r) => r.items).some((i) => i.kind === 'stack' && i.markerRoom > 0)).toBe(true);
+    });
+  }
 });
