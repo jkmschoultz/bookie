@@ -35,6 +35,15 @@ export function spineCues({ status, owned }: Pick<Book, 'status' | 'owned'>): Sp
   };
 }
 
+/** How far each marker sticks out of the top of the spine, in px (the slip's slant lifts one corner a little higher). */
+export const MARKER_REACH = { ribbon: 11, tab: 6, slip: 14 } as const;
+
+/** How far the book's markers stick out of the top of its spine, in px; 0 when it has none. */
+export function markerReach(book: Pick<Book, 'status' | 'owned'>): number {
+  const cues = spineCues(book);
+  return Math.max(0, cues.ribbon ? MARKER_REACH.ribbon : 0, cues.tab ? MARKER_REACH.tab : 0, cues.slip ? MARKER_REACH.slip : 0);
+}
+
 export interface Crease {
   /** Where the crease crosses the spine, as a fraction of its height from the top. */
   at: number;

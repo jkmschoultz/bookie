@@ -2,6 +2,7 @@ import { makeBook } from '@/test/makeBook';
 
 import type { ShelfGroup } from '../grouping';
 import { LABEL_MAX_WIDTH, labelPlateWidth, layoutShelves } from '../layout';
+import { MARKER_REACH } from '../spineCues';
 
 function group(key: string, n: number, pages = 300): ShelfGroup {
   return { key, label: key, books: Array.from({ length: n }, (_, i) => makeBook({ title: `${key} ${i}`, pageCount: pages })) };
@@ -60,6 +61,23 @@ describe('layoutShelves', () => {
     const stacks = a.flatMap((r) => r.items).filter((i) => i.kind === 'stack');
     expect(stacks.length).toBeGreaterThan(0);
     for (const s of stacks) if (s.kind === 'stack') expect(s.height).toBeLessThanOrEqual(110);
+  });
+
+  it('leaves a gap before a pile for markers sticking out of its books, and none when there are none', () => {
+    const stacks = (gs: ShelfGroup[]) =>
+      layoutShelves(gs, { mode: 'row', shelfWidth: 300 })
+        .flatMap((r) => r.items)
+        .filter((i) => i.kind === 'stack');
+    const plain = stacks(groups);
+    const marked = stacks(groups.map((g) => ({ ...g, books: g.books.map((b) => ({ ...b, status: 'dnf' as const })) })));
+    expect(marked.length).toBe(plain.length);
+    plain.forEach((p, i) => {
+      const m = marked[i];
+      if (p.kind !== 'stack' || m.kind !== 'stack') return;
+      expect(p.markerRoom).toBe(0);
+      expect(m.markerRoom).toBeGreaterThan(MARKER_REACH.slip);
+      expect(m.width).toBe(p.width + m.markerRoom);
+    });
   });
 
   it('never stacks books in small groups', () => {

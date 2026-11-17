@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } fr
 
 import { Colors, Fonts } from '@/constants/theme';
 import { registerSpine, useBookFlight, type Rect, type SpineRect } from '@/library/bookFlight';
-import { creases, ghostColors, GHOST_FILL, spineCues } from '@/shelf/spineCues';
+import { creases, ghostColors, GHOST_FILL, MARKER_REACH, spineCues } from '@/shelf/spineCues';
 import { DECORATION, type SpineStyle } from '@/shelf/spineStyle';
 import { LINE_HEIGHT } from '@/shelf/spineText';
 import type { Book } from '@/types';
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   },
   bookmark: {
     position: 'absolute',
-    top: -11,
+    top: -MARKER_REACH.ribbon,
     right: '18%',
     width: 6,
     height: 16,
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     position: 'absolute',
-    top: -6,
+    top: -MARKER_REACH.tab,
     left: '20%',
     width: 8,
     height: 12,
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   },
   slip: {
     position: 'absolute',
-    top: -12,
+    top: -MARKER_REACH.slip + 2,
     left: '24%',
     width: 7,
     height: 22,

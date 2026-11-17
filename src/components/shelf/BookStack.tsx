@@ -21,7 +21,7 @@ function BookStackComponent({ item, onOpen, onLongPress }: Props) {
   // Render top-down; item.books is ordered bottom-first.
   const books = [...item.books].reverse();
   return (
-    <View style={{ width: item.width, height: item.height, justifyContent: 'flex-end' }}>
+    <View style={{ width: item.width, height: item.height, paddingLeft: item.markerRoom, justifyContent: 'flex-end' }}>
       {books.map(({ book, style }) => (
         <LyingBook key={book.id} book={book} style={style} onOpen={onOpen} onLongPress={onLongPress} />
       ))}

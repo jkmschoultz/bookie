@@ -1,6 +1,6 @@
 import type { ReadStatus } from '@/types';
 
-import { creases, ghostColors, spineCues } from '../spineCues';
+import { creases, ghostColors, MARKER_REACH, markerReach, spineCues } from '../spineCues';
 import { UNOWNED_OPACITY } from '../spineStyle';
 
 const STATUSES: ReadStatus[] = ['reading', 'read', 'owned', 'want', 'dnf'];
@@ -34,6 +34,16 @@ describe('spineCues', () => {
       expect(spineCues({ status, owned: true }).opacity).toBe(1);
       expect(spineCues({ status, owned: false }).opacity).toBe(status === 'want' ? 1 : UNOWNED_OPACITY);
     }
+  });
+});
+
+describe('markerReach', () => {
+  it('is how far the ribbon, tab or slip sticks out, and 0 without one', () => {
+    expect(markerReach({ status: 'reading', owned: false })).toBe(MARKER_REACH.ribbon);
+    expect(markerReach({ status: 'want', owned: true })).toBe(MARKER_REACH.tab);
+    expect(markerReach({ status: 'dnf', owned: true })).toBe(MARKER_REACH.slip);
+    expect(markerReach({ status: 'read', owned: true })).toBe(0);
+    expect(markerReach({ status: 'want', owned: false })).toBe(0);
   });
 });
 

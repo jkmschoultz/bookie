@@ -58,7 +58,7 @@ const ALL_STEPS: Step[] = [
     icon: '📖',
     title: 'Books you own, and books you don’t',
     points: [
-      'A book on your shelf looks solid, and a sticky tab marks one you want to read next. One you don’t own, such as a borrowed book, is faded, and a book you want but don’t own is just an outline.',
+      'A book on your shelf looks solid, and one you don’t own is faded. A book you want but don’t own is just an outline; a sticky tab marks a book you own and want to read.',
       'Choose which when you add a book. You’ll be asked again when you start a book you wanted, and you can switch it any time from its page or by pressing and holding it.',
     ],
     visual: <OwnershipExample />,
