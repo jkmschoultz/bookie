@@ -50,7 +50,7 @@ const ALL_STEPS: Step[] = [
     points: [
       'Sort shelves by genre, author, title, publish date or what you read recently.',
       'Filter by reading progress: Reading, Read, Unread, Want to read or Did not finish.',
-      'Tap a book for its details, or press and hold to change its status. A book you’re reading holds a bookmark.',
+      'Tap a book for its details, or press and hold to change its status. A book you’re reading holds a bookmark, a finished one shows a few creases, and one you gave up on keeps a slip of paper where you stopped.',
     ],
     visual: <ReadingExample />,
   },
@@ -58,7 +58,7 @@ const ALL_STEPS: Step[] = [
     icon: '📖',
     title: 'Books you own, and books you don’t',
     points: [
-      'A book on your shelf looks solid. One you don’t own, such as a book you want or one you’ve borrowed, is faded.',
+      'A book on your shelf looks solid, and a sticky tab marks one you want to read next. One you don’t own, such as a borrowed book, is faded, and a book you want but don’t own is just an outline.',
       'Choose which when you add a book. You’ll be asked again when you start a book you wanted, and you can switch it any time from its page or by pressing and holding it.',
     ],
     visual: <OwnershipExample />,

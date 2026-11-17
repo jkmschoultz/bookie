@@ -12,6 +12,10 @@ export const Colors = {
   accentText: '#1a120c',
   danger: '#d4634a',
   ribbon: '#b3202a',
+  /** A sticky tab on a book you want to read next. */
+  tab: '#e3c35f',
+  /** A slip of paper left in a book you didn't finish. */
+  paper: '#ece2cc',
 } as const;
 
 export const Wood = {

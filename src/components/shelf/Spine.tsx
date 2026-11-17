@@ -5,7 +5,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } fr
 
 import { Colors, Fonts } from '@/constants/theme';
 import { registerSpine, useBookFlight, type Rect, type SpineRect } from '@/library/bookFlight';
-import { DECORATION, UNOWNED_OPACITY, type SpineStyle } from '@/shelf/spineStyle';
+import { creases, ghostColors, GHOST_FILL, spineCues } from '@/shelf/spineCues';
+import { DECORATION, type SpineStyle } from '@/shelf/spineStyle';
 import { LINE_HEIGHT } from '@/shelf/spineText';
 import type { Book } from '@/types';
 
@@ -18,6 +19,9 @@ interface Props {
 
 const SHADING = ['rgba(0,0,0,0.38)', 'rgba(255,255,255,0.14)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.3)'] as const;
 const SHADING_STOPS = [0, 0.22, 0.55, 1] as const;
+/** A soft highlight down an unread book's crisp spine. */
+const SHEEN = ['rgba(255,255,255,0)', 'rgba(255,255,255,0.24)', 'rgba(255,255,255,0)'] as const;
+const SHEEN_STOPS = [0.26, 0.36, 0.5] as const;
 
 /** Spine ornaments. The text is set clear of them (see TEXT_INSETS in spineStyle), and the label box wraps the title. */
 function Decoration({ s }: { s: SpineStyle }) {
@@ -48,17 +52,26 @@ function Decoration({ s }: { s: SpineStyle }) {
   }
 }
 
-/** How a spine looks: colour, ornaments, shading and its upright title. Also drawn tipped over in a pile, and by the book flying to its page. */
+/** How a spine looks: colour, ornaments, shading, its upright title and its status cue. Also drawn tipped over in a pile, and by the book flying to its page. */
 export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle }) {
   const { text } = s;
+  const cues = spineCues(book);
+  const ghost = cues.ghost ? ghostColors(s.color) : null;
   // The text runs between its insets, which differ per decoration (e.g. more room below a band at the top).
   const textLength = s.height - text.start - text.end;
   return (
     <>
-      <View style={[styles.spine, { backgroundColor: s.color }]}>
-        <Decoration s={s} />
-        <LinearGradient colors={SHADING} locations={SHADING_STOPS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        {book.status === 'dnf' && <View style={styles.dnf} />}
+      <View style={styles.spine}>
+        {/* A ghost book (wanted, not owned) is only a see-through fill inside a dashed outline. */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: s.color }, ghost && { opacity: GHOST_FILL }]}>
+          <Decoration s={s} />
+          <LinearGradient colors={SHADING} locations={SHADING_STOPS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+        </View>
+        {cues.creases && <Creases book={book} height={s.height} />}
+        {cues.sheen && (
+          <LinearGradient colors={SHEEN} locations={SHEEN_STOPS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+        )}
+        {ghost && <View style={[styles.ghostOutline, { borderColor: ghost.outline }]} />}
         {/* Text is laid out horizontally, then rotated to run top-to-bottom. */}
         <View
           style={[
@@ -75,7 +88,7 @@ export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle })
             numberOfLines={text.numberOfLines}
             style={{
               flexShrink: 1,
-              color: s.textColor,
+              color: ghost?.text ?? s.textColor,
               fontSize: text.fontSize,
               lineHeight: text.fontSize * LINE_HEIGHT,
               textAlign: text.lines.length > 1 ? 'center' : 'left',
@@ -86,13 +99,35 @@ export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle })
             {text.lines.join('\n')}
           </Text>
           {text.author && (
-            <Text numberOfLines={1} style={[styles.author, { color: s.textColor, fontSize: text.authorSize, maxWidth: textLength * 0.4 }]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.author, { color: ghost?.text ?? s.textColor, fontSize: text.authorSize, maxWidth: textLength * 0.4 }]}>
               {text.author}
             </Text>
           )}
         </View>
       </View>
-      {book.status === 'reading' && <View style={styles.bookmark} />}
+      {/* Markers tucked into the pages stick out of the top, behind the spine. */}
+      {cues.ribbon && <View style={styles.bookmark} />}
+      {cues.tab && <View style={styles.tab} />}
+      {cues.slip && <View style={styles.slip} />}
+    </>
+  );
+}
+
+/** A read book's wear: each crease a dark fold with a catch of light just below it. */
+function Creases({ book, height }: { book: Book; height: number }) {
+  return (
+    <>
+      {creases(book.id).map(({ at, strength, from, length, tilt }) => (
+        <View
+          key={at}
+          style={[
+            styles.crease,
+            { top: Math.round(at * height), left: `${from * 100}%`, width: `${length * 100}%`, opacity: strength, transform: [{ rotate: `${tilt}deg` }] },
+          ]}
+        />
+      ))}
     </>
   );
 }
@@ -143,7 +178,7 @@ function SpineComponent({ book, style: s, onOpen, onLongPress }: Props) {
       accessibilityLabel={`${book.title} by ${book.authors.join(', ')}`}>
       <Animated.View
         ref={ref}
-        style={[{ width: s.width, height: s.height, opacity: away ? 0 : book.owned ? 1 : UNOWNED_OPACITY }, animated]}>
+        style={[{ width: s.width, height: s.height, opacity: away ? 0 : spineCues(book).opacity }, animated]}>
         <SpineFace book={book} style={s} />
       </Animated.View>
     </Pressable>
@@ -186,9 +221,19 @@ const styles = StyleSheet.create({
     right: 3,
     borderWidth: StyleSheet.hairlineWidth * 2,
   },
-  dnf: {
+  crease: {
+    position: 'absolute',
+    height: 2,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.28)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.12)',
+  },
+  ghostOutline: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(20,12,6,0.35)',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 2,
   },
   bookmark: {
     position: 'absolute',
@@ -199,6 +244,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ribbon,
     borderTopLeftRadius: 1,
     borderTopRightRadius: 1,
+    zIndex: -1,
+  },
+  tab: {
+    position: 'absolute',
+    top: -6,
+    left: '20%',
+    width: 8,
+    height: 12,
+    backgroundColor: Colors.tab,
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 1,
+    zIndex: -1,
+  },
+  slip: {
+    position: 'absolute',
+    top: -12,
+    left: '24%',
+    width: 7,
+    height: 22,
+    backgroundColor: Colors.paper,
+    transform: [{ rotate: '-14deg' }],
     zIndex: -1,
   },
 });

@@ -4,7 +4,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { LYING_TILT, registerSpine, standUp, useBookFlight, type SpineRect } from '@/library/bookFlight';
 import { hashUnit } from '@/shelf/hash';
 import { STACK_JITTER, type StackItem } from '@/shelf/layout';
-import { UNOWNED_OPACITY, type SpineStyle } from '@/shelf/spineStyle';
+import { spineCues } from '@/shelf/spineCues';
+import type { SpineStyle } from '@/shelf/spineStyle';
 import type { Book } from '@/types';
 
 import { SpineFace } from './Spine';
@@ -49,7 +50,7 @@ function LyingBook({ book, style: s, onOpen, onLongPress }: { book: Book; style:
       onLongPress={() => onLongPress(book)}
       accessibilityRole="button"
       accessibilityLabel={`${book.title} by ${book.authors.join(', ')}`}
-      style={{ width: s.height, height: s.width, marginLeft: STACK_JITTER / 2 + offset, opacity: away ? 0 : book.owned ? 1 : UNOWNED_OPACITY }}>
+      style={{ width: s.height, height: s.width, marginLeft: STACK_JITTER / 2 + offset, opacity: away ? 0 : spineCues(book).opacity }}>
       <View ref={ref} style={StyleSheet.absoluteFill}>
         <View style={[styles.upright, { left: upright.x, top: upright.y, width: upright.width, height: upright.height }]}>
           <SpineFace book={book} style={s} />
