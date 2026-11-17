@@ -5,7 +5,7 @@ const VERSION_KEY = 'onboarding.version';
 
 /**
  * Bump this when the welcome tour gains something worth telling people who've already seen it, and give the new or
- * changed steps this version as their `since`. Anyone on an older version is shown just those steps, once, as
+ * changed steps this version as their `since`. Anyone on an older version is offered just those steps, once, as
  * "What's new" (see `tourSteps`). Version 1 is the original tour, which didn't record a version.
  */
 export const TOUR_VERSION = 4;
@@ -25,6 +25,12 @@ export interface TourStepInfo {
  */
 export function tourSteps<T extends TourStepInfo>(steps: readonly T[], seenVersion: number | null, { web }: { web: boolean }): T[] {
   return steps.filter((s) => (web || !s.webOnly) && (seenVersion == null || s.since > seenVersion));
+}
+
+/** What the "Psst" alert tells a returning user about the tour steps that are new to them, given their titles. */
+export function whatsNewMessage(titles: readonly string[]): string {
+  if (titles.length === 1) return `There's something new: ${titles[0].charAt(0).toLowerCase()}${titles[0].slice(1)}. Want a look?`;
+  return `The welcome tour has ${titles.length} new things in it. Want a look?`;
 }
 
 /** The tour version last seen on this device, or null if the tour has never been seen. */

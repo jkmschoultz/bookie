@@ -1,4 +1,4 @@
-import { markOnboardingSeen, seenTourVersion, TOUR_VERSION, tourSteps, type TourStepInfo } from '../onboarding';
+import { markOnboardingSeen, seenTourVersion, TOUR_VERSION, tourSteps, whatsNewMessage, type TourStepInfo } from '../onboarding';
 
 const mockStore = new Map<string, string>();
 jest.mock('expo-sqlite/kv-store', () => ({
@@ -54,5 +54,17 @@ describe('tourSteps', () => {
   it('leaves out browser-only steps outside a browser tab, even when they are new', () => {
     expect(names(tourSteps(STEPS, null, { web: false }))).toEqual(['welcome', 'ownership', 'spines', 'backup']);
     expect(tourSteps([step('home screen', 3, true)], 2, { web: false })).toEqual([]);
+  });
+});
+
+describe('whatsNewMessage', () => {
+  it('names a single new step', () => {
+    expect(whatsNewMessage(['What the spines mean'])).toBe("There's something new: what the spines mean. Want a look?");
+  });
+
+  it('counts several new steps', () => {
+    expect(whatsNewMessage(['Books you own', 'Keep it on your home screen', 'What the spines mean'])).toBe(
+      'The welcome tour has 3 new things in it. Want a look?',
+    );
   });
 });

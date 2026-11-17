@@ -6,6 +6,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alert } from '@/components/alert';
 import { BringBooksNote } from '@/components/BringBooksNote';
 import { MovedBanner } from '@/components/MovedBanner';
 import { QuickActions } from '@/components/QuickActions';
@@ -15,7 +16,7 @@ import { TOUR_STEPS, inBrowserTab } from '@/components/tourSteps';
 import { Colors, Fonts } from '@/constants/theme';
 import { PULL_OUT_MS, useBookFlight, type SpineRect } from '@/library/bookFlight';
 import { useLibrary } from '@/library/LibraryProvider';
-import { markOnboardingSeen, seenTourVersion, tourSteps } from '@/library/onboarding';
+import { markOnboardingSeen, seenTourVersion, tourSteps, whatsNewMessage } from '@/library/onboarding';
 import { sampleBooks } from '@/library/sampleBooks';
 import { filterBooks } from '@/shelf/filter';
 import { useUi } from '@/store/uiStore';
@@ -32,10 +33,15 @@ export default function BookshelfScreen() {
     SplashScreen.hideAsync();
     seenTourVersion().then(async (seen) => {
       if (seen == null) router.push('/welcome');
-      else if (tourSteps(TOUR_STEPS, seen, { web: inBrowserTab() }).length) {
-        // Shown once per tour version, however far they get through it.
+      else {
+        const fresh = tourSteps(TOUR_STEPS, seen, { web: inBrowserTab() });
+        if (!fresh.length) return;
+        // Asked once per tour version, whichever way they answer.
         await markOnboardingSeen();
-        router.push({ pathname: '/welcome', params: { since: String(seen) } });
+        alert('Psst, Bookie has been updated', whatsNewMessage(fresh.map((s) => s.title)), [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Show me', onPress: () => router.push({ pathname: '/welcome', params: { since: String(seen) } }) },
+        ]);
       }
     });
   }, [loaded]);
