@@ -1,6 +1,6 @@
 import { makeBook } from '@/test/makeBook';
 
-import { contrastText, DECORATION, getSpineStyle, SPINE, spineHeight, spineWidth } from '../spineStyle';
+import { contrastText, DECORATION, getSpineStyle, SPINE, spineHeight, spineWidth, zoomSpineStyle } from '../spineStyle';
 
 describe('spineWidth', () => {
   it('grows with page count', () => {
@@ -87,5 +87,35 @@ describe('getSpineStyle', () => {
   it('picks readable text colours', () => {
     expect(contrastText('#f5f0e1')).toBe('#1d1a16');
     expect(contrastText('#1c1c1c')).toBe('#f4ecd8');
+  });
+});
+
+describe('zoomSpineStyle', () => {
+  const book = makeBook({ title: 'The Left Hand of Darkness', authors: ['Ursula K. Le Guin'], pageCount: 320 });
+
+  it('draws the spine and its text bigger, set exactly as at the normal size', () => {
+    const normal = getSpineStyle(book);
+    const big = zoomSpineStyle(normal, 1.5);
+    expect(normal.zoom).toBe(1);
+    expect(big.zoom).toBe(1.5);
+    expect(big.width).toBeCloseTo(normal.width * 1.5);
+    expect(big.height).toBeCloseTo(normal.height * 1.5);
+    expect(big.text).toEqual({
+      ...normal.text,
+      start: normal.text.start * 1.5,
+      end: normal.text.end * 1.5,
+      titleLength: normal.text.titleLength * 1.5,
+      fontSize: normal.text.fontSize * 1.5,
+      authorSize: normal.text.authorSize * 1.5,
+    });
+    expect({ ...big, width: 0, height: 0, text: null, zoom: 0 }).toEqual({ ...normal, width: 0, height: 0, text: null, zoom: 0 });
+  });
+
+  it('leaves a spine at its own zoom alone, and zooms back to where it started', () => {
+    const normal = getSpineStyle(book);
+    expect(zoomSpineStyle(normal, 1)).toBe(normal);
+    const back = zoomSpineStyle(zoomSpineStyle(normal, 1.5), 1);
+    expect(back.width).toBeCloseTo(normal.width);
+    expect(back.text.fontSize).toBeCloseTo(normal.text.fontSize);
   });
 });

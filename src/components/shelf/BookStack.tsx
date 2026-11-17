@@ -35,7 +35,8 @@ function BookStackComponent({ item, onOpen, onLongPress }: Props) {
  */
 function LyingBook({ book, style: s, onOpen, onLongPress }: { book: Book; style: SpineStyle } & Pick<Props, 'onOpen' | 'onLongPress'>) {
   const ref = useRef<ComponentRef<typeof View>>(null);
-  const offset = (hashUnit(String(book.id), 'offset') - 0.5) * STACK_JITTER;
+  const jitter = STACK_JITTER * s.zoom;
+  const offset = (hashUnit(String(book.id), 'offset') - 0.5) * jitter;
   // While this book is flying to or from its page it isn't in the pile.
   const away = useBookFlight((f) => f.flight?.book.id === book.id);
   // Let a book coming back from its page find where to land.
@@ -50,7 +51,7 @@ function LyingBook({ book, style: s, onOpen, onLongPress }: { book: Book; style:
       onLongPress={() => onLongPress(book)}
       accessibilityRole="button"
       accessibilityLabel={`${book.title} by ${book.authors.join(', ')}`}
-      style={{ width: s.height, height: s.width, marginLeft: STACK_JITTER / 2 + offset, opacity: away ? 0 : spineCues(book).opacity }}>
+      style={{ width: s.height, height: s.width, marginLeft: jitter / 2 + offset, opacity: away ? 0 : spineCues(book).opacity }}>
       <View ref={ref} style={StyleSheet.absoluteFill}>
         <View style={[styles.upright, { left: upright.x, top: upright.y, width: upright.width, height: upright.height }]}>
           <SpineFace book={book} style={s} />

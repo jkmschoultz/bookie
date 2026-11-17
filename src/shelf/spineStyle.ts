@@ -66,6 +66,8 @@ export interface SpineStyle {
   uppercase: boolean;
   /** How the title (and author) are set on the spine. */
   text: SpineText;
+  /** How much bigger than normal the spine is drawn, ornaments and all (see zoomSpineStyle). */
+  zoom: number;
 }
 
 function clamp(v: number, min: number, max: number) {
@@ -132,5 +134,27 @@ export function getSpineStyle(book: Book, scale = 1): SpineStyle {
     font,
     uppercase,
     text: fitSpineText(book.title, book.authors[0], { width, height, font, uppercase, ...TEXT_INSETS[decoration] }),
+    zoom: 1,
+  };
+}
+
+/** The same spine drawn `zoom` times as big, text and ornaments too, so it looks just like the page zoomed in. */
+export function zoomSpineStyle(style: SpineStyle, zoom: number): SpineStyle {
+  if (zoom === style.zoom) return style;
+  const k = zoom / style.zoom;
+  const { text } = style;
+  return {
+    ...style,
+    width: style.width * k,
+    height: style.height * k,
+    text: {
+      ...text,
+      start: text.start * k,
+      end: text.end * k,
+      titleLength: text.titleLength * k,
+      fontSize: text.fontSize * k,
+      authorSize: text.authorSize * k,
+    },
+    zoom,
   };
 }
