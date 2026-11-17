@@ -158,7 +158,9 @@ jobs:
             // somehow isn't, it gets a preview rather than risk taking staging from the real holder.
             const oldest = pulls.find((p) => p.head.repo && p.head.repo.full_name === `${owner}/${repo}`);
             const holdsStaging = oldest !== undefined && oldest.number === context.issue.number;
-            core.setOutput('branch', holdsStaging ? 'staging' : process.env.HEAD_BRANCH);
+            // A branch that's literally called staging would land on staging, so it's deployed as pr-<number>.
+            const own = process.env.HEAD_BRANCH === 'staging' ? `pr-${context.issue.number}` : process.env.HEAD_BRANCH;
+            core.setOutput('branch', holdsStaging ? 'staging' : own);
             core.setOutput('staging', holdsStaging ? 'true' : 'false');
             core.setOutput('holder', oldest ? String(oldest.number) : '');
 
@@ -191,11 +193,15 @@ jobs:
               : process.env.STAGING_HOLDER
                 ? `**Preview:** ${process.env.PREVIEW_URL} — staging is held by #${process.env.STAGING_HOLDER} (the oldest open PR).`
                 : `**Preview:** ${process.env.PREVIEW_URL}`;
+            // A library lives in the browser, per address, so staging's is shared by every PR that has held it.
+            const library = process.env.HOLDS_STAGING === 'true'
+              ? "Staging's library is shared with earlier PRs that held staging, and is separate from the live app."
+              : 'It has its own empty library, separate from the live app.';
             const body = [
               marker,
               where,
               '',
-              `Built from ${sha} ([this build](${process.env.DEPLOYMENT_URL})). It has its own empty library, separate from the live app.`,
+              `Built from ${sha} ([this build](${process.env.DEPLOYMENT_URL})). ${library}`,
             ].join('\n');
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
