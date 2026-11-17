@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
-import { findSpine, flightFrame, PULL_OUT_MS, useBookFlight, type Flight, type Rect } from '@/library/bookFlight';
+import { findSpine, flightFrame, lyingTilt, PULL_OUT_MS, standUp, tiltShift, useBookFlight, type Flight, type Rect } from '@/library/bookFlight';
 import { getSpineStyle } from '@/shelf/spineStyle';
 
 import { COVER_ASPECT, Cover } from './Cover';
@@ -18,6 +18,8 @@ const PULL_MS = PULL_OUT_MS + 180;
 /** Sliding back into its gap on the shelf, at the end of the way back. */
 const PUSH_IN_MS = 200;
 const PULL_LIFT = 26;
+/** A book lying in a pile slides out sideways instead of up. */
+const PULL_SLIDE = 36;
 const PULL_GROW = 0.12;
 /** How long to wait for the other end before giving up and letting the screens show their own book. */
 const WAIT = 2000;
@@ -100,8 +102,14 @@ function FlyingBook({ flight }: { flight: Flight }) {
     return () => clearTimeout(shelved);
   }, [opening, spine, finish, p, out]);
 
+  // A book from a pile flies as if upright and is tipped over towards the shelf end (see `lyingTilt`).
+  const lying = !!spine?.lying;
   // Whichever end isn't known yet stands in as the other end, so nothing moves until it is.
-  const from: Rect = spine ?? { x: cover!.x - style.width, y: cover!.y, width: style.width, height: style.height };
+  const from: Rect = spine
+    ? lying
+      ? standUp(spine)
+      : spine
+    : { x: cover!.x - style.width, y: cover!.y, width: style.width, height: style.height };
   const to: Rect = cover ?? { x: from.x + from.width, y: from.y, width: coverWidth, height: from.height };
   const baseScale = from.height / style.height;
 
@@ -109,11 +117,14 @@ function FlyingBook({ flight }: { flight: Flight }) {
     const f = flightFrame(from, to, p.value);
     // Coming out of the shelf blends into the flight, so it lands exactly on the page's cover (and back).
     const pull = out.value * (1 - p.value);
+    const scale = baseScale * f.scale * (1 + PULL_GROW * pull);
+    const tilt = lying ? lyingTilt(p.value) : 0;
+    const shift = tiltShift({ width: style.width * scale, height: style.height * scale }, tilt);
     return {
-      left: f.hingeX,
-      top: f.top - PULL_LIFT * pull,
+      left: f.hingeX + (lying ? PULL_SLIDE * pull : 0),
+      top: f.top - (lying ? 0 : PULL_LIFT * pull),
       opacity: fade.value,
-      transform: [{ scale: baseScale * f.scale * (1 + PULL_GROW * pull) }],
+      transform: [{ translateX: shift.x }, { translateY: shift.y }, { rotate: `${tilt}deg` }, { scale }],
     };
   });
   const spineFace = useAnimatedStyle(() => ({

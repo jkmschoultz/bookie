@@ -1,4 +1,4 @@
-import { findSpine, flightFrame, registerSpine, useBookFlight } from '../bookFlight';
+import { findSpine, flightFrame, lyingTilt, registerSpine, standUp, tiltShift, useBookFlight } from '../bookFlight';
 import { makeBook } from '@/test/makeBook';
 import { getSpineStyle } from '@/shelf/spineStyle';
 
@@ -17,6 +17,36 @@ describe('flightFrame', () => {
   it('finishes turning a little before it lands', () => {
     expect(flightFrame(spine, cover, 0.85).turn).toBe(90);
     expect(flightFrame(spine, cover, 0.5).turn).toBeCloseTo(52.9, 1);
+  });
+});
+
+describe('a book from a pile', () => {
+  // Lying on its side: as wide as the book is tall, as high as its spine is wide.
+  const lying = { x: 200, y: 600, width: 180, height: 24 };
+
+  it('flies as if upright, about the same middle', () => {
+    expect(standUp(lying)).toEqual({ x: 278, y: 522, width: 24, height: 180 });
+  });
+
+  it('starts tipped over and is upright well before it lands', () => {
+    expect(lyingTilt(0)).toBe(-90);
+    expect(lyingTilt(0.45)).toBeCloseTo(0);
+    expect(lyingTilt(1)).toBeCloseTo(0);
+  });
+
+  it('is drawn exactly where it lay', () => {
+    const upright = standUp(lying);
+    const { hingeX, top } = flightFrame(upright, { x: 110, y: 92, width: 170, height: 255 }, 0);
+    const shift = tiltShift(upright, lyingTilt(0));
+    // Tipped over to the left, the top of the hinge (the spine's top right corner) ends up at the pile book's top left.
+    expect(hingeX + shift.x).toBeCloseTo(lying.x);
+    expect(top + shift.y).toBeCloseTo(lying.y);
+  });
+
+  it('needs no shift once upright', () => {
+    const shift = tiltShift({ width: 24, height: 180 }, 0);
+    expect(shift.x).toBeCloseTo(0);
+    expect(shift.y).toBeCloseTo(0);
   });
 });
 
