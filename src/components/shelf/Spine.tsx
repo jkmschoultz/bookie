@@ -48,7 +48,7 @@ function Decoration({ s }: { s: SpineStyle }) {
   }
 }
 
-/** How a spine looks: colour, ornaments, shading and its upright title. Also drawn by the book flying to its page. */
+/** How a spine looks: colour, ornaments, shading and its upright title. Also drawn tipped over in a pile, and by the book flying to its page. */
 export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle }) {
   const { text } = s;
   // The text runs between its insets, which differ per decoration (e.g. more room below a band at the top).

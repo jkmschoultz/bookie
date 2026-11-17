@@ -1,4 +1,4 @@
-import { findSpine, flightFrame, lyingTilt, registerSpine, standUp, tiltShift, useBookFlight } from '../bookFlight';
+import { findSpine, flightFrame, LYING_TILT, lyingTilt, registerSpine, standUp, tiltShift, useBookFlight } from '../bookFlight';
 import { makeBook } from '@/test/makeBook';
 import { getSpineStyle } from '@/shelf/spineStyle';
 
@@ -28,8 +28,9 @@ describe('a book from a pile', () => {
     expect(standUp(lying)).toEqual({ x: 278, y: 522, width: 24, height: 180 });
   });
 
-  it('starts tipped over and is upright well before it lands', () => {
-    expect(lyingTilt(0)).toBe(-90);
+  it('starts tipped over just as it lies in the pile, and is upright well before it lands', () => {
+    expect(lyingTilt(0)).toBe(LYING_TILT);
+    expect(LYING_TILT).toBe(-90);
     expect(lyingTilt(0.45)).toBeCloseTo(0);
     expect(lyingTilt(1)).toBeCloseTo(0);
   });
