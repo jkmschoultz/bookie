@@ -104,13 +104,16 @@ export function standUp(rect: Rect): Rect {
   return { x: rect.x + (rect.width - rect.height) / 2, y: rect.y + (rect.height - rect.width) / 2, width: rect.height, height: rect.width };
 }
 
+/** How a book in a pile lies: its upright spine tipped over this far, so its title reads left to right. */
+export const LYING_TILT = -90;
+
 /**
- * How far a book from a pile is still tipped over at `p`: -90° (lying, as in the pile) to 0° (upright). It stands up in
- * the first part of the flight, while it starts turning to its cover.
+ * How far a book from a pile is still tipped over at `p`: LYING_TILT (lying, as in the pile) to 0° (upright). It stands
+ * up in the first part of the flight, while it starts turning to its cover.
  */
 export function lyingTilt(p: number): number {
   'worklet';
-  return -90 * (1 - Math.min(1, p / 0.45));
+  return LYING_TILT * (1 - Math.min(1, p / 0.45));
 }
 
 /**
