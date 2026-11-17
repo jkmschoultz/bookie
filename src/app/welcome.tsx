@@ -10,6 +10,7 @@ import { ReadingExample } from '@/components/ReadingExample';
 import { SizeExample } from '@/components/SizeExample';
 import { SupportNote } from '@/components/SupportNote';
 import { Colors, Fonts } from '@/constants/theme';
+import { isStandalone } from '@/library/bringBooks';
 import { markOnboardingSeen } from '@/library/onboarding';
 
 interface Step {
@@ -67,7 +68,7 @@ const ALL_STEPS: Step[] = [
     title: 'Keep it on your home screen',
     points: [
       'Add Bookie to your home screen to open it like an app, full screen.',
-      'Do this before adding books: the home-screen app can have its own empty library, separate from the browser. Settings → Export backup and Restore moves books across.',
+      'Do this before adding books: the home-screen app can have its own empty library, separate from the browser. Settings → Export backup and Restore from backup move books across.',
     ],
     visual: <HomeScreenGuide />,
     webOnly: true,
@@ -82,14 +83,11 @@ const ALL_STEPS: Step[] = [
   },
 ];
 
-/** Already launched from the home screen, so there's nothing left to explain. */
-const installed = () =>
-  Platform.OS === 'web' && (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true);
-
 /** First-launch walkthrough. Also reachable from Settings. */
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
-  const STEPS = useMemo(() => ALL_STEPS.filter((s) => !s.webOnly || (Platform.OS === 'web' && !installed())), []);
+  // Already launched from the home screen: nothing left to explain about adding it there.
+  const STEPS = useMemo(() => ALL_STEPS.filter((s) => !s.webOnly || (Platform.OS === 'web' && !isStandalone())), []);
   const [index, setIndex] = useState(0);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const { width, height } = size;
