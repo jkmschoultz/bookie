@@ -2,6 +2,7 @@ import type { Book } from '@/types';
 
 import type { ShelfGroup } from './grouping';
 import { hashUnit } from './hash';
+import { markerReach } from './spineCues';
 import { getSpineStyle, type SpineStyle } from './spineStyle';
 import { textWidth } from './textWidth';
 
@@ -22,6 +23,8 @@ export interface StackItem {
   books: { book: Book; style: SpineStyle }[];
   width: number;
   height: number;
+  /** Space kept free on the side the books' tops face, for a ribbon, tab or slip to stick out into. */
+  markerRoom: number;
 }
 
 /** Separates two groups sharing a shelf in wrap mode. */
@@ -87,6 +90,8 @@ const STACK_CHANCE = 0.4;
 const STACK_MIN_GROUP = 5;
 /** Room for the books in a pile to sit slightly out of line. */
 export const STACK_JITTER = 8;
+/** Clear space between a lying book's marker and the book before the pile. */
+const MARKER_GAP = 2;
 
 /** Decide deterministically whether a group ends in a flat stack, and of how many books. */
 function stackSize(group: ShelfGroup, styles: SpineStyle[], maxHeight: number): number {
@@ -118,12 +123,16 @@ function itemsForGroup(group: ShelfGroup, scale: number, maxStackHeight: number)
       .slice(upright)
       .map((book, i) => ({ book, style: styles[upright + i] }))
       .sort((a, b) => b.style.height - a.style.height);
+    // Lying books' tops face the book before the pile, so their markers need a gap there instead of poking into it.
+    const reach = Math.max(...books.map((b) => markerReach(b.book)));
+    const markerRoom = reach && reach + MARKER_GAP;
     items.push({
       kind: 'stack',
       key: `s${books.map((b) => b.book.id).join('-')}`,
       books,
-      width: Math.max(...books.map((b) => b.style.height)) + STACK_JITTER,
+      width: Math.max(...books.map((b) => b.style.height)) + STACK_JITTER + markerRoom,
       height: books.reduce((h, b) => h + b.style.width, 0),
+      markerRoom,
     });
   }
   return items;
