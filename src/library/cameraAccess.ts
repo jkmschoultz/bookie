@@ -9,7 +9,11 @@ const ALLOWED_KEY = 'camera.allowed';
  * still asks, that's its own prompt; if it refuses, the step comes back.
  */
 export async function cameraAllowedBefore(): Promise<boolean> {
-  return (await Storage.getItem(ALLOWED_KEY)) != null;
+  try {
+    return (await Storage.getItem(ALLOWED_KEY)) != null;
+  } catch {
+    return false;
+  }
 }
 
 export async function rememberCameraAllowed(allowed: boolean): Promise<void> {
@@ -23,12 +27,14 @@ export async function rememberCameraAllowed(allowed: boolean): Promise<void> {
  */
 export type CameraGate = 'wait' | 'camera' | 'ask' | 'blocked';
 
+/** `unknown`: the browser couldn't say (older Safari has no way to ask), so treat it as not yet asked. */
 export function cameraGate(
-  permission: { granted: boolean; status: string } | null,
+  permission: { granted: boolean; status: string } | 'unknown' | null,
   allowedBefore: boolean | null,
   failed: boolean,
 ): CameraGate {
   if (!permission || allowedBefore == null) return 'wait';
+  if (permission === 'unknown') return allowedBefore && !failed ? 'camera' : 'ask';
   if (permission.granted) return 'camera';
   if (permission.status === 'denied') return 'blocked';
   return allowedBefore && !failed ? 'camera' : 'ask';
