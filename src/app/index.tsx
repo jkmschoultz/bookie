@@ -7,6 +7,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/components/alert';
+import { BringBooksNote } from '@/components/BringBooksNote';
 import { MovedBanner } from '@/components/MovedBanner';
 import { QuickActions } from '@/components/QuickActions';
 import { SortBar } from '@/components/SortBar';
@@ -93,6 +94,7 @@ export default function BookshelfScreen() {
       </View>
 
       <MovedBanner />
+      <BringBooksNote />
 
       {loaded && books.length === 0 ? (
         <EmptyLibrary onSample={() => addBooks(sampleBooks())} />

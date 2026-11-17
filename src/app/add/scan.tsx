@@ -1,11 +1,12 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { alert } from '@/components/alert';
 import { Colors } from '@/constants/theme';
+import { cameraAllowedBefore, cameraGate, rememberCameraAllowed } from '@/library/cameraAccess';
 import { useLibrary } from '@/library/LibraryProvider';
 import { lookupIsbn } from '@/services/metadata/lookup';
 import { emptyDraft } from '@/types';
@@ -15,11 +16,21 @@ import { useUi } from '@/store/uiStore';
 const isBookBarcode = (code: string) => /^97[89]\d{10}$/.test(code);
 
 export default function ScanScreen() {
-  const [permission, requestPermission] = useCameraPermissions();
+  // Looked up here rather than by the hook, so a browser that can't say (older Safari) still gets the usual step.
+  const [permission, requestPermission, getPermission] = useCameraPermissions({ get: false });
+  const [unknown, setUnknown] = useState(false);
+  // Whether the camera has worked here before, and whether starting it straight away just failed.
+  const [allowedBefore, setAllowedBefore] = useState<boolean | null>(null);
+  const [failed, setFailed] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const busy = useRef(false);
   const setDraft = useUi((s) => s.setDraft);
   const { findByIsbn } = useLibrary();
+
+  useEffect(() => {
+    cameraAllowedBefore().then(setAllowedBefore);
+    getPermission().catch(() => setUnknown(true));
+  }, [getPermission]);
 
   const reset = () => {
     busy.current = false;
@@ -59,13 +70,29 @@ export default function ScanScreen() {
     ]);
   };
 
-  if (!permission) return <View style={styles.center} />;
-  if (!permission.granted) {
+  const gate = cameraGate(permission ?? (unknown ? 'unknown' : null), allowedBefore, failed);
+  if (gate === 'wait') return <View style={styles.center} />;
+  if (gate !== 'camera') {
+    // Once refused, asking again shows nothing: on the web reload so the browser takes the new setting; on phones,
+    // ask again only if the system still allows it, otherwise go to the app's settings.
+    const retry =
+      gate !== 'blocked'
+        ? requestPermission
+        : Platform.OS === 'web'
+          ? () => window.location.reload()
+          : permission?.canAskAgain
+            ? requestPermission
+            : () => Linking.openSettings();
+    const retryLabel = gate !== 'blocked' ? 'Allow camera' : Platform.OS !== 'web' && !permission?.canAskAgain ? 'Open settings' : 'Try again';
     return (
       <View style={styles.center}>
-        <Text style={styles.text}>Bookie needs the camera to scan ISBN barcodes.</Text>
-        <Pressable style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Allow camera</Text>
+        <Text style={styles.text}>
+          {gate === 'blocked'
+            ? 'Camera access is turned off for Bookie. Turn it back on in your browser or phone settings to scan ISBN barcodes.'
+            : 'Bookie needs the camera to scan ISBN barcodes.'}
+        </Text>
+        <Pressable style={styles.button} onPress={retry}>
+          <Text style={styles.buttonText}>{retryLabel}</Text>
         </Pressable>
       </View>
     );
@@ -78,6 +105,12 @@ export default function ScanScreen() {
         facing="back"
         barcodeScannerSettings={{ barcodeTypes: ['ean13'] }}
         onBarcodeScanned={onScanned}
+        onCameraReady={() => rememberCameraAllowed(true)}
+        onMountError={() => {
+          // Refused, or no camera after all: forget it worked, and ask in the usual way.
+          rememberCameraAllowed(false);
+          setFailed(true);
+        }}
       />
       <View style={styles.overlay} pointerEvents="none">
         <View style={styles.frame} />

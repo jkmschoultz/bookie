@@ -1,7 +1,8 @@
 name: CI
 
-# Every pull request into master is tested, test-built, typechecked and linted, then deployed to a throwaway
-# Cloudflare preview address that's posted on the PR. Once something lands on master (a merge or a direct push) and
+# Every pull request into master is tested, test-built, typechecked and linted, then deployed to Cloudflare and the
+# address is posted on the PR. The oldest open PR holds staging (staging.mybookie.pages.dev); every other PR gets a
+# throwaway preview address under its branch name. Once something lands on master (a merge or a direct push) and
 # the tests and build pass, that same build is deployed to production on Cloudflare (mybookie.pages.dev). The old
 # address on Expo (bookie.expo.app) is frozen on its last deploy, which points people here: see the README.
 #
@@ -135,12 +136,39 @@ jobs:
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
         run: node scripts/prepare-cloudflare.mjs dist
 
-      # Deployed under the PR's branch name, so each PR keeps one address that updates with every push.
-      - name: Deploy preview
+      # The oldest open PR into master (drafts included, forks left out as above) holds staging; every other PR is
+      # deployed under its own branch name, so it keeps one address that updates with every push. Nothing happens when
+      # the holder closes: staging keeps its last build until the next oldest PR pushes and takes it over.
+      # Two PRs can only both deploy to staging if the holder closes while the next one's run is already past this
+      # step. Then the later deploy wins and the next push puts it right, so there's no shared concurrency group
+      # (one would queue every PR's preview behind the others and cancel the queued ones).
+      - name: Choose staging or a preview
+        id: target
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        uses: actions/github-script@v7
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pulls = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', base: 'master', sort: 'created', direction: 'asc', per_page: 100,
+            });
+            // head.repo is null when a fork has been deleted. This PR is open, so it's normally in the list; if it
+            // somehow isn't, it gets a preview rather than risk taking staging from the real holder.
+            const oldest = pulls.find((p) => p.head.repo && p.head.repo.full_name === `${owner}/${repo}`);
+            const holdsStaging = oldest !== undefined && oldest.number === context.issue.number;
+            // A branch that's literally called staging would land on staging, so it's deployed as pr-<number>.
+            const own = process.env.HEAD_BRANCH === 'staging' ? `pr-${context.issue.number}` : process.env.HEAD_BRANCH;
+            core.setOutput('branch', holdsStaging ? 'staging' : own);
+            core.setOutput('staging', holdsStaging ? 'true' : 'false');
+            core.setOutput('holder', oldest ? String(oldest.number) : '');
+
+      - name: Deploy
         id: deploy
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
         env:
-          BRANCH: ${{ github.head_ref }}
+          BRANCH: ${{ steps.target.outputs.branch }}
           WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.json
         run: |
           npx --yes "$WRANGLER" pages deploy dist --project-name "$CLOUDFLARE_PROJECT" --branch "$BRANCH" --commit-dirty=true
@@ -148,21 +176,32 @@ jobs:
           echo "url=$(echo "$result" | jq -r '.url')" >> "$GITHUB_OUTPUT"
           echo "alias=$(echo "$result" | jq -r '.alias // .url')" >> "$GITHUB_OUTPUT"
 
-      - name: Post the preview address on the PR
+      - name: Post the address on the PR
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
         uses: actions/github-script@v7
         env:
           PREVIEW_URL: ${{ steps.deploy.outputs.alias }}
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+          HOLDS_STAGING: ${{ steps.target.outputs.staging }}
+          STAGING_HOLDER: ${{ steps.target.outputs.holder }}
         with:
           script: |
             const marker = '<!-- bookie-preview -->';
             const sha = context.payload.pull_request.head.sha.slice(0, 7);
+            const where = process.env.HOLDS_STAGING === 'true'
+              ? '**Staging:** https://staging.mybookie.pages.dev — this is the oldest open PR, so it holds staging.'
+              : process.env.STAGING_HOLDER
+                ? `**Preview:** ${process.env.PREVIEW_URL} — staging is held by #${process.env.STAGING_HOLDER} (the oldest open PR).`
+                : `**Preview:** ${process.env.PREVIEW_URL}`;
+            // A library lives in the browser, per address, so staging's is shared by every PR that has held it.
+            const library = process.env.HOLDS_STAGING === 'true'
+              ? "Staging's library is shared with earlier PRs that held staging, and is separate from the live app."
+              : 'It has its own empty library, separate from the live app.';
             const body = [
               marker,
-              `**Preview:** ${process.env.PREVIEW_URL}`,
+              where,
               '',
-              `Built from ${sha} ([this build](${process.env.DEPLOYMENT_URL})). It has its own empty library, separate from the live app.`,
+              `Built from ${sha} ([this build](${process.env.DEPLOYMENT_URL})). ${library}`,
             ].join('\n');
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;

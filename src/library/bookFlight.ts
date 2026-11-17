@@ -17,6 +17,8 @@ export interface Rect {
 /** Where a tapped spine is, and how it looks, for the flight to start from. */
 export interface SpineRect extends Rect {
   style: SpineStyle;
+  /** Lying on its side in a pile, spine text running left to right, so the box is as wide as the book is tall. */
+  lying?: boolean;
 }
 
 export interface Flight {
@@ -69,7 +71,7 @@ export function registerSpine(bookId: number, measure: MeasureSpine): () => void
   };
 }
 
-/** Where a book's spine is on screen, or null if it isn't on a shelf in view (scrolled away, filtered out, a pile). */
+/** Where a book's spine is on screen, or null if it isn't on a shelf in view (scrolled away, filtered out, deleted). */
 export async function findSpine(bookId: number, screen: { width: number; height: number }): Promise<SpineRect | null> {
   const rect = await spines.get(bookId)?.();
   if (!rect || rect.width <= 0 || rect.height <= 0) return null;
@@ -95,4 +97,34 @@ export function flightFrame(from: Rect, to: Rect, p: number): { hingeX: number; 
     scale: mix(1, to.height / from.height),
     turn,
   };
+}
+
+/** The box a lying book fills once stood upright about the same middle: the flight works with upright books. */
+export function standUp(rect: Rect): Rect {
+  return { x: rect.x + (rect.width - rect.height) / 2, y: rect.y + (rect.height - rect.width) / 2, width: rect.height, height: rect.width };
+}
+
+/**
+ * How far a book from a pile is still tipped over at `p`: -90° (lying, as in the pile) to 0° (upright). It stands up in
+ * the first part of the flight, while it starts turning to its cover.
+ */
+export function lyingTilt(p: number): number {
+  'worklet';
+  return -90 * (1 - Math.min(1, p / 0.45));
+}
+
+/**
+ * The flying book is drawn from the top of its hinge (where spine meets cover). Tilting it by `deg` about that corner,
+ * then shifting it by this much, tilts it about the middle of its spine instead, so a lying book stays where it lay.
+ * `spine` is the spine's size as drawn (after scaling).
+ */
+export function tiltShift(spine: { width: number; height: number }, deg: number): { x: number; y: number } {
+  'worklet';
+  const a = (deg * Math.PI) / 180;
+  const cos = Math.cos(a);
+  const sin = Math.sin(a);
+  // From the middle of the spine to the hinge's top, before and after turning.
+  const dx = spine.width / 2;
+  const dy = -spine.height / 2;
+  return { x: dx * cos - dy * sin - dx, y: dx * sin + dy * cos - dy };
 }

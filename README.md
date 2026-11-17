@@ -72,10 +72,12 @@ The old address is no longer updated, so keep the receiving side working with it
 1. **Tests**: the unit tests. Required to merge.
 2. **Build**: the same web export the deploy uses. Required to merge.
 3. **Typecheck & lint**: advisory. A failure shows as a red cross on the PR but doesn't have to block merging.
-4. **Preview deploy**: after Build, deploys that build to Cloudflare Pages under the PR's branch name (`<branch>.mybookie.pages.dev`, the same address for every push to the PR) and posts it on the PR. It's a separate, empty library from the live app.
+4. **Preview deploy**: after Build, deploys that build to Cloudflare Pages and posts the address on the PR. The oldest open PR into `master` holds staging (`staging.mybookie.pages.dev`); every other PR is deployed under its own branch name (`<branch>.mybookie.pages.dev`, the same address for every push to the PR; a branch called `staging` gets `pr-<number>` instead), and its comment says which PR holds staging. Drafts count, so an old draft holds staging until it's closed; PRs from forks get no deploy at all. A library lives in the browser, per address: each preview starts with its own empty library, while staging's is shared with earlier PRs that held staging. Both are separate from the live app.
 5. **Deploy to production**: only on pushes to `master` (a merged PR or a direct push). Waits for Tests and Build, then deploys that build to Cloudflare Pages production (`mybookie.pages.dev`). Typecheck & lint doesn't hold it up.
 
-On a PR, the first four run in parallel. `npm run deploy:prod` and `npm run deploy:staging` still work for deploying by hand. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
+When the PR holding staging is merged or closed, staging keeps that last build until the next oldest PR pushes and takes it over (its comment changes from Preview to Staging then). Two PRs could briefly both deploy to staging if the holder closes during the other's run; the later one wins and the next push puts it right.
+
+On a PR, the first four run in parallel. `npm run deploy:prod` and `npm run deploy:staging` still work for deploying by hand, but a manual `deploy:staging` is overwritten by the next push from the oldest open PR. One-time setup in the GitHub repo (Settings → Secrets and variables → Actions):
 
 - `CLOUDFLARE_API_TOKEN` secret (needed for previews and the production deploy): create one at dash.cloudflare.com → My Profile → API Tokens → Create Token → Custom token, with the permission Account → Cloudflare Pages → Edit, for your account. Without it those jobs skip their Cloudflare steps.
 - `CLOUDFLARE_ACCOUNT_ID` variable (Variables tab): your account ID, shown in the Cloudflare dashboard (Workers & Pages → Overview, on the right) or in the address bar after `dash.cloudflare.com/`.
