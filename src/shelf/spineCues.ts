@@ -8,7 +8,7 @@ import { contrastText, relativeLuminance, UNOWNED_OPACITY } from './spineStyle';
 export interface SpineCues {
   /** Reading: a red bookmark ribbon out of the top. */
   ribbon: boolean;
-  /** Read: a few faint creases across the spine. */
+  /** Read: a few faint creases down the spine, where it was bent open. */
   creases: boolean;
   /** Unread or wanted, on your shelf: a crisp spine with a soft sheen. */
   sheen: boolean;
@@ -44,34 +44,93 @@ export function markerReach(book: Pick<Book, 'status' | 'owned'>): number {
   return Math.max(0, cues.ribbon ? MARKER_REACH.ribbon : 0, cues.tab ? MARKER_REACH.tab : 0, cues.slip ? MARKER_REACH.slip : 0);
 }
 
-export interface Crease {
-  /** Where the crease crosses the spine, as a fraction of its height from the top. */
-  at: number;
+/** One straight piece of a crease, in px from the spine's top-left corner as it stands upright. */
+export interface CreaseSegment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
   /** How strongly it shows, 0–1. */
   strength: number;
-  /** Where it starts and how far it runs across the spine, as fractions of its width: wear rarely crosses edge to edge. */
-  from: number;
-  length: number;
-  /** A slight slope, in degrees, so it doesn't look like a printed rule. */
-  tilt: number;
+  /** Whether it fades out at its top or bottom end: where the crease starts, stops or breaks off. */
+  fadeStart: boolean;
+  fadeEnd: boolean;
 }
 
-/** Creases stay off the ends of the spine, where its bands and frame are. */
-const CREASE_ZONE = { from: 0.18, to: 0.82 } as const;
+/** Creases stay off the ends of the spine, where its bands and frame are, as fractions of its height. */
+export const CREASE_ZONE = { from: 0.14, to: 0.9 } as const;
+/** The middle of the spine's width, where the title runs, as fractions of the width: creases run either side of it. */
+export const CREASE_LANES = { from: 0.14, to: 0.86, centre: 0.12 } as const;
+/** Pieces drawn per book at most, to keep a shelf of read books light. */
+export const MAX_CREASE_SEGMENTS = 6;
+/** How far a crease wanders sideways from its line, in px at most. */
+const WANDER = 1.2;
 
-/** Two or three creases for a read book, placed differently on every book but always the same on one. */
-export function creases(id: number): Crease[] {
+/**
+ * A read book's spine creases: one to three lines running down the spine where it was bent open, each a few pieces
+ * that wander a little and sometimes break off, the first one long through the middle and the others shorter.
+ * Placed differently on every book but always the same on one, and fewer on a thin spine.
+ */
+export function creases(id: number, width: number, height: number): CreaseSegment[][] {
   const seed = String(id);
-  const count = hashUnit(seed, 'crease-count') < 0.5 ? 2 : 3;
-  const span = (CREASE_ZONE.to - CREASE_ZONE.from) / count;
-  // One crease in each part of the zone, somewhere within it, so they never bunch up.
-  return Array.from({ length: count }, (_, i) => ({
-    at: CREASE_ZONE.from + span * (i + 0.15 + 0.7 * hashUnit(seed, `crease-at-${i}`)),
-    strength: 0.5 + 0.5 * hashUnit(seed, `crease-strength-${i}`),
-    from: 0.25 * hashUnit(seed, `crease-from-${i}`),
-    length: 0.5 + 0.25 * hashUnit(seed, `crease-length-${i}`),
-    tilt: (hashUnit(seed, `crease-tilt-${i}`) - 0.5) * 6,
-  }));
+  const r = (key: string) => hashUnit(seed, `crease-${key}`);
+  const roll = r('count');
+  const room = width < 20 ? 1 : width < 34 ? 2 : 3;
+  const count = Math.min(room, roll < 0.3 ? 1 : roll < 0.75 ? 2 : 3);
+  const lanes = creaseLanes(count, r('side') < 0.5);
+  const zone = { from: CREASE_ZONE.from * height, to: CREASE_ZONE.to * height };
+  let budget = MAX_CREASE_SEGMENTS;
+
+  return lanes.map(([laneFrom, laneTo], i) => {
+    const k = (key: string) => r(`${i}-${key}`);
+    // The first crease is the long one where the spine bent most, through its middle; the others are shorter and anywhere.
+    const main = i === 0;
+    const length = (zone.to - zone.from) * (main ? 0.55 + 0.4 * k('length') : 0.22 + 0.3 * k('length'));
+    const centre = main ? height * (0.45 + 0.1 * k('at')) : zone.from + length / 2 + (zone.to - zone.from - length) * k('at');
+    const top = Math.max(zone.from, centre - length / 2);
+    const bottom = Math.min(zone.to, centre + length / 2);
+    const pieces = Math.min(budget - (lanes.length - 1 - i), main ? 3 : 1 + Math.floor(2 * k('pieces')));
+    budget -= pieces;
+    // Where the crease bends a little, and maybe breaks off for a stretch.
+    const cuts = Array.from({ length: pieces - 1 }, (_, c) => (c + 0.6 + 0.8 * k(`cut-${c}`)) / pieces).sort((a, b) => a - b);
+    const gap = pieces > 1 && k('gap') < 0.35 ? Math.floor(k('gap-at') * (pieces - 1)) : -1;
+    const gapLength = (0.03 + 0.04 * k('gap-length')) * height;
+    const lane = { from: laneFrom * width, to: laneTo * width };
+    const xAt = (j: number) => clamp(lane.from + (lane.to - lane.from) * k('x') + WANDER * (2 * k(`wander-${j}`) - 1), lane.from, lane.to);
+    const ys = [0, ...cuts, 1].map((t) => top + (bottom - top) * t);
+    const xs = ys.map((_, j) => xAt(j));
+    const strength = main ? 0.75 + 0.25 * k('strength') : 0.45 + 0.35 * k('strength');
+    return Array.from({ length: pieces }, (_, j) => {
+      const broken = (c: number) => c === gap;
+      return {
+        x1: xs[j],
+        y1: broken(j - 1) ? ys[j] + gapLength / 2 : ys[j],
+        x2: xs[j + 1],
+        y2: broken(j) ? ys[j + 1] - gapLength / 2 : ys[j + 1],
+        // Strongest in the middle of the crease and weaker towards its ends.
+        strength: strength * (pieces > 2 && (j === 0 || j === pieces - 1) ? 0.75 : 1),
+        fadeStart: j === 0 || broken(j - 1),
+        fadeEnd: j === pieces - 1 || broken(j),
+      };
+    });
+  });
+}
+
+/** Ranges across the spine's width for each crease, as fractions, on either side of the title and never sharing one. */
+function creaseLanes(count: number, leftFirst: boolean): [number, number][] {
+  const { from, to, centre } = CREASE_LANES;
+  const left: [number, number] = [from, 0.5 - centre];
+  const right: [number, number] = [0.5 + centre, to];
+  const [first, second] = leftFirst ? [left, right] : [right, left];
+  if (count === 1) return [first];
+  if (count === 2) return [first, second];
+  // Three: the long one on its own side, the two short ones sharing the other, each in its own half of it.
+  const mid = (second[0] + second[1]) / 2;
+  return [first, [second[0], mid - 0.02], [mid + 0.02, second[1]]];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 /** How much of its colour a ghost book's see-through fill keeps. */

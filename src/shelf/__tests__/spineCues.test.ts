@@ -1,6 +1,6 @@
 import type { ReadStatus } from '@/types';
 
-import { creases, ghostColors, MARKER_REACH, markerReach, spineCues } from '../spineCues';
+import { CREASE_LANES, CREASE_ZONE, creases, ghostColors, MARKER_REACH, markerReach, MAX_CREASE_SEGMENTS, spineCues, type CreaseSegment } from '../spineCues';
 import { UNOWNED_OPACITY } from '../spineStyle';
 
 const STATUSES: ReadStatus[] = ['reading', 'read', 'owned', 'want', 'dnf'];
@@ -48,31 +48,91 @@ describe('markerReach', () => {
 });
 
 describe('creases', () => {
+  const SIZES = [
+    [12, 132],
+    [18, 160],
+    [26, 180],
+    [40, 200],
+    [82, 212],
+  ] as const;
+  const each = (check: (list: CreaseSegment[][], width: number, height: number, id: number) => void) => {
+    for (const [width, height] of SIZES) for (let id = 0; id < 200; id++) check(creases(id, width, height), width, height, id);
+  };
+
   it('is the same for a book every time', () => {
-    expect(creases(42)).toEqual(creases(42));
+    expect(creases(42, 26, 180)).toEqual(creases(42, 26, 180));
   });
 
   it('differs between books', () => {
-    const layouts = new Set(Array.from({ length: 20 }, (_, id) => JSON.stringify(creases(id))));
+    const layouts = new Set(Array.from({ length: 20 }, (_, id) => JSON.stringify(creases(id, 40, 200))));
     expect(layouts.size).toBe(20);
   });
 
-  it('places two or three short, slightly sloped creases in order, inside the spine and clear of its ends', () => {
-    for (let id = 0; id < 200; id++) {
-      const list = creases(id);
-      expect(list.length).toBeGreaterThanOrEqual(2);
-      expect(list.length).toBeLessThanOrEqual(3);
-      list.forEach(({ at, strength, from, length, tilt }, i) => {
-        expect(from).toBeGreaterThanOrEqual(0);
-        expect(from + length).toBeLessThanOrEqual(1);
-        expect(Math.abs(tilt)).toBeLessThanOrEqual(3);
-        expect(at).toBeGreaterThan(0.18);
-        expect(at).toBeLessThan(0.82);
+  it('draws one to three creases in a few pieces, fewer on a thin spine', () => {
+    each((list, width) => {
+      expect(list.length).toBeGreaterThanOrEqual(1);
+      expect(list.length).toBeLessThanOrEqual(width < 20 ? 1 : width < 34 ? 2 : 3);
+      list.forEach((crease) => expect(crease.length).toBeGreaterThanOrEqual(1));
+      expect(list.flat().length).toBeLessThanOrEqual(MAX_CREASE_SEGMENTS);
+    });
+    const counts = new Set(Array.from({ length: 200 }, (_, id) => creases(id, 60, 200).length));
+    expect([...counts].sort()).toEqual([1, 2, 3]);
+  });
+
+  it('runs down the spine, clear of its ends and either side of the title in the middle', () => {
+    each((list, width, height) => {
+      for (const { x1, y1, x2, y2, strength } of list.flat()) {
+        for (const x of [x1, x2]) {
+          expect(x).toBeGreaterThanOrEqual(CREASE_LANES.from * width - 1e-9);
+          expect(x).toBeLessThanOrEqual(CREASE_LANES.to * width + 1e-9);
+          expect(Math.abs(x / width - 0.5)).toBeGreaterThanOrEqual(CREASE_LANES.centre - 1e-9);
+        }
+        for (const y of [y1, y2]) {
+          expect(y).toBeGreaterThanOrEqual(CREASE_ZONE.from * height - 1e-9);
+          expect(y).toBeLessThanOrEqual(CREASE_ZONE.to * height + 1e-9);
+        }
+        // Along the spine, wandering only slightly sideways.
+        expect(y2).toBeGreaterThan(y1);
+        expect(Math.abs(x2 - x1)).toBeLessThan((y2 - y1) * 0.25 + 2.5);
         expect(strength).toBeGreaterThan(0);
         expect(strength).toBeLessThanOrEqual(1);
-        if (i > 0) expect(at - list[i - 1].at).toBeGreaterThan(0.05);
-      });
-    }
+      }
+    });
+  });
+
+  it('makes each crease one line top to bottom, joined unless it breaks off, fading where it starts and stops', () => {
+    each((list) => {
+      for (const crease of list) {
+        expect(crease[0].fadeStart).toBe(true);
+        expect(crease[crease.length - 1].fadeEnd).toBe(true);
+        crease.slice(1).forEach((piece, j) => {
+          const before = crease[j];
+          expect(piece.x1).toBe(before.x2);
+          expect(piece.y1).toBeGreaterThanOrEqual(before.y2);
+          // A break fades out on both sides of it; a bend doesn't.
+          expect(piece.fadeStart).toBe(before.fadeEnd);
+          expect(piece.fadeStart).toBe(piece.y1 > before.y2);
+        });
+      }
+    });
+  });
+
+  it('starts with a long crease through the middle of the spine, longer than the others', () => {
+    each((list, width, height) => {
+      const span = (crease: CreaseSegment[]) => crease[crease.length - 1].y2 - crease[0].y1;
+      const [main, ...rest] = list;
+      expect(span(main)).toBeGreaterThan(0.4 * height);
+      expect(main[0].y1).toBeLessThan(height / 2);
+      expect(main[main.length - 1].y2).toBeGreaterThan(height / 2);
+      for (const crease of rest) expect(span(crease)).toBeLessThan(span(main));
+    });
+  });
+
+  it('never puts two creases on the same line across the spine', () => {
+    each((list) => {
+      const xs = list.map((crease) => crease[0].x1);
+      expect(new Set(xs.map((x) => x.toFixed(3))).size).toBe(xs.length);
+    });
   });
 });
 

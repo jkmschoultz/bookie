@@ -22,6 +22,9 @@ const SHADING_STOPS = [0, 0.22, 0.55, 1] as const;
 /** A soft highlight down an unread book's crisp spine. */
 const SHEEN = ['rgba(255,255,255,0)', 'rgba(255,255,255,0.24)', 'rgba(255,255,255,0)'] as const;
 const SHEEN_STOPS = [0.26, 0.36, 0.5] as const;
+/** A crease's pale line, clear at both ends so it can fade in and out. */
+const CREASE = ['rgba(255,250,238,0)', 'rgba(255,250,238,0.34)', 'rgba(255,250,238,0.34)', 'rgba(255,250,238,0)'] as const;
+const CREASE_WIDTH = 1;
 
 /** Spine ornaments. The text is set clear of them (see TEXT_INSETS in spineStyle), and the label box wraps the title. */
 function Decoration({ s }: { s: SpineStyle }) {
@@ -67,7 +70,7 @@ export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle })
           <Decoration s={s} />
           <LinearGradient colors={SHADING} locations={SHADING_STOPS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         </View>
-        {cues.creases && <Creases book={book} height={s.height} />}
+        {cues.creases && <Creases book={book} width={s.width} height={s.height} />}
         {cues.sheen && (
           <LinearGradient colors={SHEEN} locations={SHEEN_STOPS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         )}
@@ -115,19 +118,37 @@ export function SpineFace({ book, style: s }: { book: Book; style: SpineStyle })
   );
 }
 
-/** A read book's wear: each crease a dark fold with a catch of light just below it. */
-function Creases({ book, height }: { book: Book; height: number }) {
+/**
+ * A read book's spine creases: pale lines where the ink cracked off the cover, each with a faint shadow along one side,
+ * fading out where the crease starts, stops or breaks off. Each piece is a thin line turned to join its two ends.
+ */
+function Creases({ book, width, height }: { book: Book; width: number; height: number }) {
   return (
     <>
-      {creases(book.id).map(({ at, strength, from, length, tilt }) => (
-        <View
-          key={at}
-          style={[
-            styles.crease,
-            { top: Math.round(at * height), left: `${from * 100}%`, width: `${length * 100}%`, opacity: strength, transform: [{ rotate: `${tilt}deg` }] },
-          ]}
-        />
-      ))}
+      {creases(book.id, width, height).flatMap((crease, i) =>
+        crease.map(({ x1, y1, x2, y2, strength, fadeStart, fadeEnd }, j) => {
+          const length = Math.hypot(x2 - x1, y2 - y1);
+          const fade = Math.min(0.35, 10 / length);
+          return (
+            <LinearGradient
+              key={`${i}-${j}`}
+              colors={CREASE}
+              locations={[0, fadeStart ? fade : 0, fadeEnd ? 1 - fade : 1, 1]}
+              style={[
+                styles.crease,
+                {
+                  left: (x1 + x2) / 2 - CREASE_WIDTH / 2,
+                  top: (y1 + y2) / 2 - length / 2,
+                  height: length,
+                  opacity: strength,
+                  transform: [{ rotate: `${(Math.atan2(x1 - x2, y2 - y1) * 180) / Math.PI}deg` }],
+                },
+              ]}>
+              <View style={[styles.creaseShadow, { top: `${fadeStart ? 20 : 0}%`, bottom: `${fadeEnd ? 20 : 0}%` }]} />
+            </LinearGradient>
+          );
+        }),
+      )}
     </>
   );
 }
@@ -223,11 +244,13 @@ const styles = StyleSheet.create({
   },
   crease: {
     position: 'absolute',
-    height: 2,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.28)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.12)',
+    width: CREASE_WIDTH,
+  },
+  creaseShadow: {
+    position: 'absolute',
+    left: CREASE_WIDTH,
+    width: 1,
+    backgroundColor: 'rgba(0,0,0,0.16)',
   },
   ghostOutline: {
     ...StyleSheet.absoluteFill,
