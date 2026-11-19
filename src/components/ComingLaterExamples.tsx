@@ -50,7 +50,7 @@ export function FriendsLibraryExample() {
   return (
     <View style={styles.room}>
       {FRIENDS.map((f) => (
-        <TourShelf key={f.name} height={92} scale={0.5} label={`Example shelf: ${f.name}'s books`} slots={[{ books: f.books, caption: f.name }]} />
+        <TourShelf key={f.name} height={84} scale={0.5} label={`Example shelf: ${f.name}'s books`} slots={[{ books: f.books, caption: f.name }]} />
       ))}
     </View>
   );
