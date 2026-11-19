@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,16 @@ import { TOUR_STEPS, inBrowserTab } from '@/components/tourSteps';
 import { Colors, Fonts } from '@/constants/theme';
 import { PULL_OUT_MS, useBookFlight, type SpineRect } from '@/library/bookFlight';
 import { useLibrary } from '@/library/LibraryProvider';
-import { markOnboardingSeen, seenTourVersion, tourSteps, whatsNewMessage } from '@/library/onboarding';
+import {
+  markOnboardingSeen,
+  markWhatsToComeSeen,
+  recordAppOpen,
+  seenTourVersion,
+  shouldShowWhatsToCome,
+  tourSteps,
+  whatsNewMessage,
+  whatsToComeSeen,
+} from '@/library/onboarding';
 import { sampleBooks } from '@/library/sampleBooks';
 import { filterBooks } from '@/shelf/filter';
 import { useUi } from '@/store/uiStore';
@@ -28,14 +37,22 @@ export default function BookshelfScreen() {
   const { sortMode, layoutMode, statusFilter, ownedFilter } = useUi();
   const [actionBook, setActionBook] = useState<Book | null>(null);
 
+  // Read once the checks below are done, so "What's to come" never opens over another screen or sheet.
+  const focused = useIsFocused();
+  const now = useRef({ focused, books: books.length });
+  useEffect(() => {
+    now.current = { focused, books: books.length };
+  }, [focused, books.length]);
+
   useEffect(() => {
     if (!loaded) return;
     SplashScreen.hideAsync();
-    seenTourVersion().then(async (seen) => {
+    (async () => {
+      const opens = await recordAppOpen();
+      const seen = await seenTourVersion();
+      const fresh = seen == null ? [] : tourSteps(TOUR_STEPS, seen, { web: inBrowserTab() });
       if (seen == null) router.push('/welcome');
-      else {
-        const fresh = tourSteps(TOUR_STEPS, seen, { web: inBrowserTab() });
-        if (!fresh.length) return;
+      else if (fresh.length) {
         // Asked once per tour version, whichever way they answer.
         await markOnboardingSeen();
         alert('Psst, Bookie has been updated', whatsNewMessage(fresh.map((s) => s.title)), [
@@ -43,7 +60,12 @@ export default function BookshelfScreen() {
           { text: 'Show me', onPress: () => router.push({ pathname: '/welcome', params: { since: String(seen) } }) },
         ]);
       }
-    });
+      const tourOffered = seen == null || fresh.length > 0;
+      if (!shouldShowWhatsToCome({ opens, books: now.current.books, seen: await whatsToComeSeen(), tourOffered }) || !now.current.focused) return;
+      // Shown once, however it's closed.
+      await markWhatsToComeSeen();
+      router.push('/whats-to-come');
+    })();
   }, [loaded]);
 
   const visible = useMemo(

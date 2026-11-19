@@ -1,5 +1,5 @@
 /** Screens that open as sheets over the app on phones; on web they rise from the bottom too. */
-const SHEETS = [/^\/settings$/, /^\/add$/, /^\/welcome$/, /^\/book\//];
+const SHEETS = [/^\/settings$/, /^\/add$/, /^\/welcome$/, /^\/whats-to-come$/, /^\/book\//];
 
 export type Transition = 'forward' | 'back' | 'sheet-open' | 'sheet-close' | null;
 
