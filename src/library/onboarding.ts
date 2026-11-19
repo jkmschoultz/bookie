@@ -44,3 +44,42 @@ export async function markOnboardingSeen(): Promise<void> {
   await Storage.setItem(SEEN_KEY, new Date().toISOString());
   await Storage.setItem(VERSION_KEY, String(TOUR_VERSION));
 }
+
+const OPENS_KEY = 'app.opens';
+const WHATS_TO_COME_KEY = 'whatsToCome.seen';
+
+/** The "What's to come" preview is offered once, from this app open on. */
+export const WHATS_TO_COME_FROM_OPEN = 3;
+
+let opening: Promise<number> | null = null;
+
+/**
+ * Counts this app open and returns how many there have been on this device, this one included. Only the first call
+ * per launch counts, however often the shelf screen mounts.
+ */
+export function recordAppOpen(): Promise<number> {
+  opening ??= (async () => {
+    const opens = (Number(await Storage.getItem(OPENS_KEY)) || 0) + 1;
+    await Storage.setItem(OPENS_KEY, String(opens));
+    return opens;
+  })();
+  return opening;
+}
+
+/**
+ * Whether to show the "What's to come" preview on its own: once, from the third app open, to someone with at least one
+ * book, and never while the welcome tour or its "What's new" is being offered.
+ */
+export function shouldShowWhatsToCome({ opens, books, seen, tourOffered }: { opens: number; books: number; seen: boolean; tourOffered: boolean }): boolean {
+  return !seen && !tourOffered && books > 0 && opens >= WHATS_TO_COME_FROM_OPEN;
+}
+
+/** Whether the "What's to come" preview has been shown or closed on this device. */
+export async function whatsToComeSeen(): Promise<boolean> {
+  return (await Storage.getItem(WHATS_TO_COME_KEY)) != null;
+}
+
+/** Records that the "What's to come" preview has been shown or closed, so it isn't offered again. */
+export async function markWhatsToComeSeen(): Promise<void> {
+  await Storage.setItem(WHATS_TO_COME_KEY, new Date().toISOString());
+}

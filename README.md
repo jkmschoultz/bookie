@@ -99,6 +99,7 @@ To block merging until the right checks pass: Settings â†’ Branches (or Rules â†
 - `src/services/backup.ts`: backup file format (export / restore)
 - `src/services/files.ts`: reading picked files and saving the backup on native and web
 - `src/library/onboarding.ts`: remembers whether the first-launch walkthrough (`src/app/welcome.tsx`) has been seen
+- `src/app/whats-to-come.tsx`: a click-through preview of ideas for later (pages in `src/components/whatsToComePages.tsx`), offered once from the third app open and always in Settings
 - `assets/icon/bookie-icon.svg`: source artwork for the app icon; the icon PNGs in `assets/images/` and `public/` are rendered from it
 - `src/components/BookFlight.tsx`: the book flying between its shelf and its page (geometry in `src/library/bookFlight.ts`)
 - `src/components/ScreenTransitions.tsx`: screen slides on web (which way to slide: `src/library/screenTransition.ts`)

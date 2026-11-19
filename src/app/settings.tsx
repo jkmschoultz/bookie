@@ -137,6 +137,10 @@ export default function SettingsScreen() {
         <Pressable style={styles.firstRow} onPress={() => router.push('/welcome')}>
           <Text style={styles.rowText}>Show the welcome tour</Text>
         </Pressable>
+        <Pressable style={styles.row} onPress={() => router.push('/whats-to-come')}>
+          <Text style={styles.rowText}>What’s to come</Text>
+          <Text style={styles.rowHint}>A preview of ideas for later. None of them work yet.</Text>
+        </Pressable>
       </View>
 
       <Text style={[styles.sectionTitle, styles.spaced]}>Backup</Text>

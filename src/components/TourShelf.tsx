@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Spine } from '@/components/shelf/Spine';
@@ -40,24 +41,30 @@ export function exampleBook({ id, title, author, palette, pageCount = 420, heigh
 const noop = () => {};
 
 export interface TourSlot {
-  books: Book[];
+  books?: Book[];
+  /** Anything else standing on the shelf after the books, such as records. */
+  extras?: ReactNode;
   /** Printed on the brass plate under the books. */
   caption: string;
   /** A word or two under the shelf about what to look for. */
   note?: string;
 }
 
-/** A little shelf for the welcome tour, drawn with the real spines so it always matches how the app draws a book. */
-export function TourShelf({ slots, label, height = 196 }: { slots: TourSlot[]; label: string; height?: number }) {
+/**
+ * A little shelf for the welcome tour, drawn with the real spines so it always matches how the app draws a book.
+ * `scale` draws the books smaller than life, to fit several shelves on one page.
+ */
+export function TourShelf({ slots, label, height = 196, scale = 1 }: { slots: TourSlot[]; label: string; height?: number; scale?: number }) {
   return (
     <View style={styles.shelf} pointerEvents="none" accessible accessibilityLabel={label}>
       <LinearGradient colors={Wood.backPanel} style={StyleSheet.absoluteFill} />
       {slots.map((slot) => (
         <View key={`${slot.caption}|${slot.note}`} style={styles.slot}>
           <View style={[styles.books, { height }]}>
-            {slot.books.map((book) => (
-              <Spine key={book.id} book={book} style={getSpineStyle(book)} onOpen={noop} onLongPress={noop} />
+            {slot.books?.map((book) => (
+              <Spine key={book.id} book={book} style={getSpineStyle(book, scale)} onOpen={noop} onLongPress={noop} />
             ))}
+            {slot.extras}
           </View>
           <LinearGradient colors={Wood.plankTop} style={{ height: Shelf.plankTop }} />
           <LinearGradient colors={Wood.plankFront} style={styles.plankFront}>
