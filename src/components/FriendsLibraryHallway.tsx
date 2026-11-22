@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue,
   withDelay,
   withRepeat,
+  withSpring,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
@@ -29,6 +30,9 @@ import type { Book } from '@/types';
  *
  * Walking is one number, `walk`: how far along the hallway the eye has moved. Each moving part works out its own
  * transform from it in an animated style, so walking never re-renders anything. Drawn far to near.
+ *
+ * Walking stops at bookcases, like a list snapping to its rows: at a stop, one bookcase (on one side or the other) has
+ * its end just ahead, with its aisle sign whole. Bookcases alternate sides half a spacing apart, so stops are too.
  */
 
 /** The picture's size before it is scaled to the page. */
@@ -57,18 +61,25 @@ const FIRST_CASE = -40;
 const SHELVES = 3;
 const BOOK_SCALE = 0.28;
 
-/** One swipe walks one bookcase further; a loop is five swipes, a pause, and a fade back to the start. */
-const STEP = CASE_SPACING * 0.94;
+/** Walk between one stop and the next: from one bookcase to the next one along, on the other side. */
+const STOP = CASE_SPACING / 2;
+/** One swipe of the demo loop walks past a bookcase on each side, from stop to stop. */
+const STEP = 2 * STOP;
 const STEPS = 5;
-const WALK_END = STEP * STEPS;
 const FADE_MS = 450;
 const STEP_MS = 1500;
 const HOLD_MS = 900;
 const LOOP_MS = FADE_MS + STEPS * STEP_MS + HOLD_MS + FADE_MS;
-/** With reduced motion, the picture rests here: part way into the first step, where every near plaque is whole. */
-const STILL_MS = FADE_MS + STEP_MS * 0.55;
+/** With reduced motion, the picture rests at the first stop, faded in. */
+const STILL_MS = FADE_MS;
 /** How far a drag on the picture walks, per point dragged. */
 const DRAG_WALK = 2.2;
+/** How far a flick carries on after letting go, per unit of speed (walk per second). */
+const MOMENTUM = 0.16;
+/** How far past the first or last stop a drag can stretch, at most. */
+const STRETCH = 50;
+/** Settles on a stop with no bounce, starting at the flick's speed. */
+const SETTLE = { mass: 1, stiffness: 140, damping: 24 } as const;
 
 /**
  * On the web, moving parts get their own layers up front, so the browser only recomposites them each frame instead of
@@ -89,6 +100,19 @@ const easeInOut = (v: number) => {
 const depthScale = (z: number) => {
   'worklet';
   return EYE / (EYE - Math.min(z, EYE - 40));
+};
+
+/** The nearest stop to a walk, between the first and last bookcase. */
+const nearestStop = (walk: number, last: number) => {
+  'worklet';
+  return clamp(Math.round(walk / STOP), 0, last) * STOP;
+};
+/** A walk held between the first and last stop, giving a little past either end, harder the further it goes. */
+const stretch = (walk: number, last: number) => {
+  'worklet';
+  const end = last * STOP;
+  const over = walk < 0 ? walk : walk > end ? walk - end : 0;
+  return clamp(walk, 0, end) + Math.sign(over) * STRETCH * (1 - 1 / (1 + Math.abs(over) / (2 * STRETCH)));
 };
 
 /** Where one swipe of the loop is at time t: which swipe, and how far through it (0 to 1). */
@@ -221,20 +245,33 @@ const CaseFront = memo(function CaseFront({ friend: f, side }: { friend: Friend;
   );
 });
 
-/** A friend's name plaque, with a framed round picture. A plain silhouette stands in until there are profile pictures. */
-function Plaque({ friend: f }: { friend: Friend }) {
+/**
+ * A friend's aisle sign, like the ones at the end of library aisles: a flat brass sign held out into the hallway by two
+ * iron brackets on the bookcase's end, facing down the hallway, with a framed round picture and the friend's name.
+ * A plain silhouette stands in until there are profile pictures. `fog` darkens it with distance.
+ */
+function AisleSign({ friend: f, side, fog }: { friend: Friend; side: -1 | 1; fog: object }) {
+  const edge = side === -1 ? 'left' : 'right';
   return (
-    <LinearGradient colors={Wood.brass} style={styles.plaque}>
-      <View style={styles.photoFrame}>
-        <View style={[styles.photo, { backgroundColor: f.color }]}>
-          <View style={styles.head} />
-          <View style={styles.shoulders} />
-        </View>
+    <>
+      {[SIGN.bracketInset, SIGN.height - SIGN.bracketInset - SIGN.bracket].map((top) => (
+        <View key={top} style={[styles.bracket, { top, [edge]: CASE_DEPTH - SIGN.bracketReach }]} />
+      ))}
+      <View style={[styles.sign, { [edge]: CASE_DEPTH + SIGN.gap }]}>
+        <LinearGradient colors={Wood.brass} style={styles.signFace}>
+          <View style={styles.photoFrame}>
+            <View style={[styles.photo, { backgroundColor: f.color }]}>
+              <View style={styles.head} />
+              <View style={styles.shoulders} />
+            </View>
+          </View>
+          <Text numberOfLines={1} style={styles.name}>
+            {f.name}
+          </Text>
+        </LinearGradient>
+        <Animated.View style={[styles.fog, styles.signFog, FADING, fog]} />
       </View>
-      <Text numberOfLines={1} style={styles.name}>
-        {f.name}
-      </Text>
-    </LinearGradient>
+    </>
   );
 }
 
@@ -277,6 +314,8 @@ function SideCase({ walk, friend: f, side, near }: { walk: SharedValue<number>; 
   // Farther bookcases fade into the dark.
   const fog = useAnimatedStyle(() => ({ opacity: clamp((-(near - CASE_LENGTH / 2 + walk.value) - 220) / 760, 0, 0.88) }));
   const endFog = useAnimatedStyle(() => ({ opacity: clamp((-(near + walk.value) - 220) / 760, 0, 0.88) }));
+  // The farthest signs fade out altogether, so the row of them along each wall doesn't crowd into the window.
+  const signFade = useAnimatedStyle(() => ({ opacity: clamp((SIGN_GONE + near + walk.value) / 220, 0, 1) }));
   return (
     <>
       <Animated.View style={[styles.casePlane, MOVING, front]}>
@@ -289,9 +328,10 @@ function SideCase({ walk, friend: f, side, near }: { walk: SharedValue<number>; 
         </LinearGradient>
         <Animated.View style={[styles.fog, FADING, endFog]} />
       </Facing>
-      <Facing walk={walk} x={side * (FRONT_X + 4)} y={CASE_TOP - PLAQUE.height / 2 - 3} z={near - 4} hideAfter={60} width={PLAQUE.width} height={PLAQUE.height}>
-        <Plaque friend={f} />
-        <Animated.View style={[styles.fog, styles.plaqueFog, FADING, endFog]} />
+      <Facing walk={walk} x={side * (HALF_WIDTH - SIGN_SPAN / 2)} y={CASE_TOP + SIGN.drop + SIGN.height / 2} z={near} hideAfter={70} width={SIGN_SPAN} height={SIGN.height}>
+        <Animated.View style={[StyleSheet.absoluteFill, FADING, signFade]}>
+          <AisleSign friend={f} side={side} fog={endFog} />
+        </Animated.View>
       </Facing>
     </>
   );
@@ -447,6 +487,7 @@ export function FriendsLibraryHallway() {
   const looping = useSharedValue(0);
   const walk = useDerivedValue(() => (manual.value ? manualWalk.value : walkAt(clock.value)));
 
+  const last = FRIENDS.length - 1;
   const drag = usePanGesture({
     // On the web, leave sideways swipes to the browser, so they still turn the page. Gesture handler reads this from the
     // config, but its types leave it out.
@@ -458,6 +499,8 @@ export function FriendsLibraryHallway() {
       'worklet';
       cancelAnimation(clock);
       cancelAnimation(dim);
+      // Catch a walk that is still settling, where it is.
+      cancelAnimation(manualWalk);
       dim.set(0);
       dragStart.set(manual.value ? manualWalk.value : walkAt(clock.value));
       manualWalk.set(dragStart.value);
@@ -465,10 +508,15 @@ export function FriendsLibraryHallway() {
     },
     onUpdate: (e) => {
       'worklet';
-      manualWalk.set(clamp(dragStart.value + e.translationY * DRAG_WALK, 0, WALK_END));
+      manualWalk.set(stretch(dragStart.value + e.translationY * DRAG_WALK, last));
     },
-    onDeactivate: () => {
+    onDeactivate: (e) => {
       'worklet';
+      // Like letting go of a list: a flick carries on, then the walk settles on the nearest bookcase. With reduced
+      // motion it goes straight to the nearest one.
+      const speed = e.velocityY * DRAG_WALK;
+      if (reducedMotion) manualWalk.set(nearestStop(manualWalk.value, last));
+      else manualWalk.set(withSpring(nearestStop(manualWalk.value + speed * MOMENTUM, last), { ...SETTLE, velocity: speed }));
       if (!looping.value) return;
       // Rest where the drag left off, then fade back to the start of the loop.
       const backToStart = withTiming(1, { duration: FADE_MS }, (finished) => {
@@ -506,7 +554,7 @@ export function FriendsLibraryHallway() {
         style={styles.frame}
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         accessible
-        accessibilityLabel={`A long library hallway seen at eye level, with ${FRIENDS.length} bookcases full of books along both walls and a window at the far end. Each bookcase belongs to a friend and has a name plaque with a round photo: ${FRIENDS.map((f) => f.name).join(', ')}. The picture walks down the hallway, as if swiping down; drag down on it to walk yourself.`}>
+        accessibilityLabel={`A long library hallway seen at eye level, with ${FRIENDS.length} bookcases full of books along both walls and a window at the far end. Each bookcase belongs to a friend and has an aisle sign with their name and a round photo: ${FRIENDS.map((f) => f.name).join(', ')}. The picture walks down the hallway, as if swiping down; drag up or down on it to walk yourself, and it stops at the nearest bookcase.`}>
         {reached && width > 0 && (
           <View style={[styles.hallway, { left: (width - W) / 2, top: (H * k - H) / 2, transform: [{ scale: k }] }]} pointerEvents="none">
             <Hallway walk={walk} />
@@ -519,7 +567,12 @@ export function FriendsLibraryHallway() {
   );
 }
 
-const PLAQUE = { width: 58, height: 60 };
+/** An aisle sign: its size, how far below the top of the bookcase it hangs, and its brackets. */
+const SIGN = { width: 56, height: 62, drop: 6, gap: 5, bracket: 4, bracketInset: 9, bracketReach: 6 };
+/** From the wall to the sign's far edge: the bookcase's end, the gap the brackets span, and the sign. */
+const SIGN_SPAN = CASE_DEPTH + SIGN.gap + SIGN.width;
+/** How far down the hallway signs have faded out. */
+const SIGN_GONE = 900;
 
 const styles = StyleSheet.create({
   frame: { width: '100%', maxWidth: 432, aspectRatio: W / H, alignSelf: 'center', borderRadius: 14, overflow: 'hidden', backgroundColor: '#0d0905' },
@@ -533,14 +586,16 @@ const styles = StyleSheet.create({
   caseBase: { height: BASE, backgroundColor: Wood.plankFront[2] },
   post: { position: 'absolute', top: 0, bottom: 0, width: POST, backgroundColor: Wood.side[0], borderLeftWidth: 2, borderLeftColor: Wood.side[1] },
   fog: { ...StyleSheet.absoluteFill, backgroundColor: '#0d0905' },
-  plaqueFog: { borderRadius: 5 },
+  signFog: { borderRadius: 5 },
   spine: { borderTopLeftRadius: 1, borderTopRightRadius: 1, borderLeftWidth: 0.6, borderLeftColor: 'rgba(0,0,0,0.35)', overflow: 'hidden' },
   bands: { position: 'absolute', left: 0, right: 0, top: 3, bottom: 3, borderTopWidth: 1, borderBottomWidth: 1 },
   band: { position: 'absolute', left: 0, right: 0, top: 3, height: 3, opacity: 0.85 },
   spineFrame: { position: 'absolute', left: 1, right: 1, top: 2, bottom: 2, borderWidth: 0.6 },
   endPanel: { flex: 1, borderTopLeftRadius: 2, borderTopRightRadius: 2 },
   endTrim: { position: 'absolute', left: 4, right: 4, top: CROWN, bottom: BASE, borderWidth: 1, borderColor: 'rgba(0,0,0,0.25)', borderRadius: 2 },
-  plaque: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 5, borderWidth: 1.5, borderColor: '#7a5a22' },
+  sign: { position: 'absolute', top: 0, width: SIGN.width, height: SIGN.height, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } },
+  signFace: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 3, borderRadius: 5, borderWidth: 1.5, borderColor: '#7a5a22' },
+  bracket: { position: 'absolute', width: SIGN.gap + 2 * SIGN.bracketReach, height: SIGN.bracket, borderRadius: 1, backgroundColor: '#2b2420', borderTopWidth: 1, borderTopColor: '#6a5a4c' },
   photoFrame: { width: 30, height: 30, borderRadius: 15, padding: 2.5, backgroundColor: '#4f311b' },
   photo: { flex: 1, borderRadius: 13, overflow: 'hidden', alignItems: 'center' },
   head: { width: 9, height: 9, borderRadius: 5, marginTop: 4, backgroundColor: 'rgba(255,245,228,0.85)' },
