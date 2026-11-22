@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PageReachedContext } from '@/components/PageReached';
+import { PageStateContext } from '@/components/PageState';
 import { WHATS_TO_COME_PAGES as PAGES } from '@/components/whatsToComePages';
 import { Colors, Fonts } from '@/constants/theme';
 import { markWhatsToComeSeen } from '@/library/onboarding';
@@ -15,7 +15,7 @@ import { markWhatsToComeSeen } from '@/library/onboarding';
 export default function WhatsToComeScreen() {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
-  // The farthest page shown so far, or being moved to. Pictures on later pages wait to draw (see PageReached).
+  // The farthest page shown so far, or being moved to. Pictures on later pages wait to draw (see PageState).
   const [reached, setReached] = useState(0);
   const reach = (i: number) => setReached((r) => Math.max(r, Math.min(PAGES.length - 1, i)));
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -62,7 +62,7 @@ export default function WhatsToComeScreen() {
                   <Text style={styles.icon}>{page.icon}</Text>
                   <Text style={styles.title}>{page.title}</Text>
                   <Text style={styles.body}>{page.body}</Text>
-                  <PageReachedContext.Provider value={i <= reached}>{page.visual}</PageReachedContext.Provider>
+                  <PageStateContext.Provider value={{ reached: i <= reached, current: i === index }}>{page.visual}</PageStateContext.Provider>
                 </View>
               </ScrollView>
             ))}
