@@ -2,11 +2,11 @@ import type { ReactNode } from 'react';
 
 import {
   BookClubExample,
-  CustomBookshelfExample,
   ReadingCalendarExample,
   SuggestedReadingExample,
   VinylAndDvdExample,
 } from '@/components/ComingLaterExamples';
+import { CustomShelvesExample } from '@/components/CustomShelvesExample';
 import { FriendsLibraryRoom } from '@/components/FriendsLibraryRoom';
 
 export interface WhatsToComePage {
@@ -60,15 +60,15 @@ export const WHATS_TO_COME_PAGES: WhatsToComePage[] = [
   {
     tag: LATER,
     icon: '🪵',
-    title: 'Make your bookshelf yours',
-    body: 'Pick a wood finish, from warm oak to dark walnut, then add decorative touches to make your reading nook feel like home.',
-    visual: <CustomBookshelfExample />,
+    title: 'Make your shelves yours',
+    body: 'Choose a wood style and add plants and other small things between your books.',
+    visual: <CustomShelvesExample />,
   },
   {
     tag: LATER,
     icon: '🗓️',
     title: 'Reading calendar',
-    body: 'A suggested reading plan that spreads your books over the days of a month, with each book’s cover marking its reading days.',
+    body: 'A suggested reading plan that spreads your books over a month. Each book’s cover marks the days you’d read it.',
     visual: <ReadingCalendarExample />,
   },
 ];

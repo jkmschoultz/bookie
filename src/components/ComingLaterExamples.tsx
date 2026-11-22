@@ -1,8 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { COVER_ASPECT, Cover } from '@/components/Cover';
 import { TourShelf, exampleBook } from '@/components/TourShelf';
 import { Colors } from '@/constants/theme';
+import { sampleBooks } from '@/library/sampleBooks';
 import type { Book, ReadStatus } from '@/types';
 
 /** A made-up book for these pictures. Ids are negative and unused elsewhere, so they never clash with real books. */
@@ -17,19 +19,6 @@ const EXAMPLE_SHELVES = [
   { books: [book(-111, 'Dune', 'Herbert', ['#b3202a', '#e9dcc0'], 688, 175), book(-112, 'Neuromancer', 'Gibson', ['#1f3a5f', '#5b7fa6'], 271, 175), book(-113, 'Foundation', 'Asimov', ['#264653', '#e3c27a'], 255, 172, 'reading'), book(-114, 'Hyperion', 'Simmons', ['#3b2f5c', '#c9b6e4'], 482, 175, 'owned'), book(-115, 'Solaris', 'Lem', ['#4d6d73', '#e8e0cf'], 204, 198)] },
   { books: [book(-121, 'Emma', 'Austen', ['#2f6b5e', '#e8c875'], 474, 198), book(-122, 'Jane Eyre', 'Brontë', ['#7a1f1f', '#e9dcc0'], 532, 198, 'reading'), book(-123, 'Beloved', 'Morrison', ['#8c3b6b', '#e8e0cf'], 324, 203), book(-124, 'Persuasion', 'Austen', ['#a07850', '#2b2a33'], 249, 178, 'want'), book(-125, 'Stoner', 'Williams', ['#bb3e03', '#1c1c1c'], 288, 203, 'owned')] },
 ];
-
-/** Personalize the shelf with different wood finishes and small decorative touches. */
-export function CustomBookshelfExample() {
-  const woods = [{ name: 'OAK', color: '#bf8b55' }, { name: 'WALNUT', color: '#78513c' }, { name: 'PAINTED', color: '#738477' }];
-  return (
-    <View style={styles.customWrap} accessible accessibilityLabel="Custom bookshelf preview with oak, walnut and painted wood choices, plus a plant and framed decor">
-      <View style={styles.customShelfTop}><View style={styles.frame}><Text style={styles.frameArt}>☀</Text></View><Text style={styles.decorPlant}>🪴</Text></View>
-      <TourShelf height={110} scale={0.55} label="Example bookshelf with books and decorative objects" slots={[{ books: [again(EXAMPLE_SHELVES[0].books[0], -181), again(EXAMPLE_SHELVES[1].books[0], -182), again(EXAMPLE_SHELVES[2].books[1], -183), again(EXAMPLE_SHELVES[0].books[2], -184)], caption: 'My reading nook' }]} />
-      <View style={styles.woodRow}>{woods.map((wood) => <View key={wood.name} style={styles.woodChoice}><View style={[styles.woodSwatch, { backgroundColor: wood.color }]} /><Text style={styles.woodName}>{wood.name}</Text></View>)}</View>
-      <Text style={styles.customHint}>Choose your wood. Add the little things that make it yours.</Text>
-    </View>
-  );
-}
 
 /** A record sleeve facing out, with the record half pulled out of its side. */
 function RecordSleeve({ colors }: { colors: readonly [string, string] }) {
@@ -52,40 +41,49 @@ export function SuggestedReadingExample() {
   return <TourShelf height={150} scale={0.7} label="Example shelf: three books you've read, and two suggested books drawn as outlines" slots={[{ books: [again(EXAMPLE_SHELVES[0].books[0], -161), again(EXAMPLE_SHELVES[2].books[2], -162), again(EXAMPLE_SHELVES[1].books[1], -163)], caption: 'Your shelf' }, { books: [book(-131, 'Jonathan Strange', 'Clarke', ['#2f4a3a', '#e3c27a'], 1006, 190, 'want', false), book(-132, 'The Night Circus', 'Morgenstern', ['#1c1c1c', '#e8e0cf'], 400, 203, 'want', false)], caption: 'Suggested', note: 'Because you read Piranesi' }]} />;
 }
 
-const PLAN = [{ title: 'Piranesi', short: 'P', color: '#2b3a67', accent: '#e8c875', pages: 272, from: 2, to: 13 }, { title: 'Dune', short: 'D', color: '#b3202a', accent: '#e9dcc0', pages: 688, from: 15, to: 28 }];
+/** Two sample books, drawn with their real covers when online and the app's cloth covers when not. */
+const SAMPLES = sampleBooks();
+const sample = (title: string, id: number): Book => ({ ...SAMPLES.find((b) => b.title === title)!, id });
+const PLAN = [
+  { book: sample('Piranesi', -171), from: 2, to: 13 },
+  { book: sample('Dune', -172), from: 15, to: 28 },
+];
 const DAYS = 30;
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-/** Month plan with miniature book-cover artwork placed directly on the reading days. */
+/** Covers are drawn at a normal size and shrunk, so a tiny one still looks just like the app's cover (image or cloth). */
+const COVER_DRAWN = 120;
+function SmallCover({ book: b, width }: { book: Book; width: number }) {
+  const height = width * COVER_ASPECT;
+  return (
+    <View style={{ width, height }}>
+      <View style={{ position: 'absolute', left: (width - COVER_DRAWN) / 2, top: (height - COVER_DRAWN * COVER_ASPECT) / 2, transform: [{ scale: width / COVER_DRAWN }] }}>
+        <Cover book={b} width={COVER_DRAWN} />
+      </View>
+    </View>
+  );
+}
+
+/** A month's reading plan: each book's cover sits on the days set aside for it. */
 export function ReadingCalendarExample() {
   const weeks = Array.from({ length: Math.ceil(DAYS / 7) }, (_, w) => Array.from({ length: 7 }, (_, d) => w * 7 + d + 1));
   return (
-    <View style={styles.calendar} accessible accessibilityLabel="Example reading calendar with miniature Piranesi cover art on days 2 to 13 and Dune cover art on days 15 to 28">
-      <View style={styles.monthHeading}><Text style={styles.monthName}>A READING MONTH</Text><Text style={styles.monthNote}>Two books, one page at a time</Text></View>
+    <View style={styles.calendar} accessible accessibilityLabel="Example reading calendar: the cover of Piranesi on days 2 to 13, and the cover of Dune on days 15 to 28">
+      <View style={styles.monthHeading}><Text style={styles.monthName}>A READING MONTH</Text></View>
       <View style={styles.week}>{WEEKDAYS.map((d, i) => <Text key={i} style={[styles.weekday, { flex: 1 }]}>{d}</Text>)}</View>
       {weeks.map((week) => <View key={week[0]} style={styles.week}>{week.map((day) => {
         const plan = PLAN.find((p) => day >= p.from && day <= p.to);
         return <View key={day} style={styles.calendarCell}>
           {day <= DAYS && <Text style={styles.day}>{day}</Text>}
-          {plan && <View style={[styles.coverThumb, { backgroundColor: plan.color }]}><View style={[styles.coverSun, { backgroundColor: plan.accent }]} /><Text style={styles.coverInitial}>{plan.short}</Text></View>}
+          {plan && <SmallCover book={plan.book} width={22} />}
         </View>;
       })}</View>)}
-      <View style={styles.legend}>{PLAN.map((p) => <View key={p.title} style={styles.legendRow}><View style={[styles.legendCover, { backgroundColor: p.color }]}><View style={[styles.legendCoverMark, { backgroundColor: p.accent }]} /></View><Text style={styles.legendText}>{p.title} · {Math.round(p.pages / (p.to - p.from + 1))} pages a day</Text></View>)}</View>
+      <View style={styles.legend}>{PLAN.map(({ book: b, from, to }) => <View key={b.id} style={styles.legendRow}><SmallCover book={b} width={18} /><Text style={styles.legendText}>{b.title} · {Math.round((b.pageCount ?? 0) / (to - from + 1))} pages a day</Text></View>)}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  customWrap: { gap: 5 },
-  customShelfTop: { maxWidth: 320, width: '100%', height: 42, alignSelf: 'center', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 28 },
-  frame: { width: 33, height: 36, backgroundColor: '#d6b77f', borderWidth: 4, borderColor: '#73543b', alignItems: 'center', justifyContent: 'center' },
-  frameArt: { color: '#a35f44', fontSize: 20 },
-  decorPlant: { fontSize: 28 },
-  woodRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 7 },
-  woodChoice: { alignItems: 'center', gap: 3 },
-  woodSwatch: { width: 38, height: 18, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' },
-  woodName: { color: Colors.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
-  customHint: { color: Colors.textMuted, fontSize: 11, textAlign: 'center', marginTop: 3 },
   sleeveSlot: { width: 84, height: 60, marginRight: 3 },
   record: { position: 'absolute', top: 3, left: 30, width: 54, height: 54, borderRadius: 27, backgroundColor: '#111', borderWidth: 6, borderColor: '#1d1d1d', alignItems: 'center', justifyContent: 'center' },
   recordLabel: { width: 16, height: 16, borderRadius: 8 },
@@ -102,17 +100,11 @@ const styles = StyleSheet.create({
   calendar: { alignSelf: 'center', width: '100%', maxWidth: 320, padding: 10, borderRadius: 10, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   monthHeading: { alignItems: 'center', marginBottom: 8 },
   monthName: { color: Colors.text, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  monthNote: { color: Colors.textMuted, fontSize: 10, marginTop: 2 },
   week: { flexDirection: 'row' },
   weekday: { color: Colors.textMuted, fontSize: 10, fontWeight: '700', textAlign: 'center', height: 18 },
-  calendarCell: { flex: 1, height: 41, alignItems: 'center', paddingTop: 1 },
+  calendarCell: { flex: 1, height: 52, alignItems: 'center', paddingTop: 1 },
   day: { color: Colors.text, fontSize: 9, alignSelf: 'flex-start', marginLeft: 2 },
-  coverThumb: { width: 20, height: 27, borderRadius: 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: 1, borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)' },
-  coverSun: { position: 'absolute', width: 8, height: 8, borderRadius: 4, top: 4, right: 3, opacity: 0.9 },
-  coverInitial: { color: '#fff8e9', fontFamily: 'Georgia', fontWeight: '700', fontSize: 12 },
   legend: { marginTop: 7, gap: 5 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  legendCover: { width: 13, height: 17, borderRadius: 2, alignItems: 'center', justifyContent: 'center' },
-  legendCoverMark: { width: 6, height: 6, borderRadius: 3 },
   legendText: { color: Colors.textMuted, fontSize: 11 },
 });
