@@ -3,11 +3,11 @@ import type { ReactNode } from 'react';
 import {
   BookClubExample,
   CustomBookshelfExample,
-  FriendsLibraryExample,
   ReadingCalendarExample,
   SuggestedReadingExample,
   VinylAndDvdExample,
 } from '@/components/ComingLaterExamples';
+import { FriendsLibraryRoom } from '@/components/FriendsLibraryRoom';
 
 export interface WhatsToComePage {
   /** The small tag over the title. */
@@ -33,8 +33,8 @@ export const WHATS_TO_COME_PAGES: WhatsToComePage[] = [
     tag: LATER,
     icon: '👥',
     title: 'Friends’ library',
-    body: 'Take a bird’s-eye look around a shared library. Every bookcase belongs to a different friend, with their own bookshelves. Sharing would need optional cloud storage, and keeping your library on this device only stays an option.',
-    visual: <FriendsLibraryExample />,
+    body: 'Look into a shared library from above the entrance: rows of double-sided bookcases sit in two columns around a central aisle, and each bookcase belongs to a friend. Sharing would need optional cloud storage, and keeping your library on this device only stays an option.',
+    visual: <FriendsLibraryRoom />,
   },
   {
     tag: LATER,
