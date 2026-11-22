@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PageReachedContext } from '@/components/PageReached';
 import { WHATS_TO_COME_PAGES as PAGES } from '@/components/whatsToComePages';
 import { Colors, Fonts } from '@/constants/theme';
 import { markWhatsToComeSeen } from '@/library/onboarding';
@@ -14,15 +15,25 @@ import { markWhatsToComeSeen } from '@/library/onboarding';
 export default function WhatsToComeScreen() {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
+  // The farthest page shown so far, or being moved to. Pictures on later pages wait to draw (see PageReached).
+  const [reached, setReached] = useState(0);
+  const reach = (i: number) => setReached((r) => Math.max(r, Math.min(PAGES.length - 1, i)));
   const [size, setSize] = useState({ width: 0, height: 0 });
   const { width, height } = size;
   const pager = useRef<ScrollViewInstance>(null);
   const last = index === PAGES.length - 1;
 
   // Pages sit side by side in a paging scroller, as in the welcome tour, so they can be swiped or stepped through.
-  const goTo = (i: number) => pager.current?.scrollTo({ x: i * width, animated: true });
+  const goTo = (i: number) => {
+    reach(i);
+    pager.current?.scrollTo({ x: i * width, animated: true });
+  };
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (width > 0) setIndex(Math.min(PAGES.length - 1, Math.max(0, Math.round(e.nativeEvent.contentOffset.x / width))));
+    if (width === 0) return;
+    const at = e.nativeEvent.contentOffset.x / width;
+    setIndex(Math.min(PAGES.length - 1, Math.max(0, Math.round(at))));
+    // Start drawing the next page as soon as it begins to slide in.
+    reach(Math.ceil(at - 0.01));
   };
 
   const close = async () => {
@@ -44,14 +55,14 @@ export default function WhatsToComeScreen() {
       <View style={styles.swipeArea} onLayout={(e) => setSize(e.nativeEvent.layout)}>
         {width > 0 && height > 0 && (
           <ScrollView ref={pager} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
-            {PAGES.map((page) => (
+            {PAGES.map((page, i) => (
               <ScrollView key={page.title} alwaysBounceVertical style={{ width, height }} contentContainerStyle={styles.content}>
                 <View style={styles.page}>
                   <Text style={styles.tag}>{page.tag}</Text>
                   <Text style={styles.icon}>{page.icon}</Text>
                   <Text style={styles.title}>{page.title}</Text>
                   <Text style={styles.body}>{page.body}</Text>
-                  {page.visual}
+                  <PageReachedContext.Provider value={i <= reached}>{page.visual}</PageReachedContext.Provider>
                 </View>
               </ScrollView>
             ))}

@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, Text, View, type TransformsStyle } from 'react-native';
 
+import { usePageReached } from '@/components/PageReached';
 import { SpineFace } from '@/components/shelf/Spine';
 import { Fonts, Wood } from '@/constants/theme';
 import { sampleBooks } from '@/library/sampleBooks';
@@ -36,8 +37,8 @@ const CASE_TOP = FLOOR - CASE_HEIGHT;
 const CASE_DEPTH = 36;
 const SIDE_CASE = { near: -50, far: -262 };
 const BACK_CASE = { width: 96, spacing: 108 };
-const SHELVES = 4;
-const BOOK_SCALE = 0.19;
+const SHELVES = 3;
+const BOOK_SCALE = 0.28;
 
 /** How much smaller something at depth z (negative, away from the eye) is drawn. */
 const depthScale = (z: number) => EYE / (EYE - z);
@@ -85,8 +86,8 @@ function friend(index: number, name: string, color: string, genres: string[]): F
   const books = [...mine, ...mine, ...rest].map((b, i) => ({
     ...b,
     id: -2000 - index * 200 - i,
-    // A friend's shelves only hold books they own.
-    status: b.status === 'want' ? 'owned' : b.status,
+    // A friend's shelves only hold books they own. Read creases are too small to see here, so those are drawn plain too.
+    status: b.status === 'want' || b.status === 'read' ? 'owned' : b.status,
     owned: true,
   }));
   return { name, color, genres, books };
@@ -312,34 +313,38 @@ function Lamp() {
 
 /** Looking into a library room at eye level: a bookcase for each friend, each with their name and picture on top. */
 export function FriendsLibraryRoom() {
-  const [width, setWidth] = useState(W);
+  const reached = usePageReached();
+  // The frame keeps the room's shape at any width; the room is drawn in it once its width is known and its page reached.
+  const [width, setWidth] = useState(0);
   const k = width / W;
   return (
     <View
-      style={[styles.frame, { height: H * k }]}
+      style={styles.frame}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       pointerEvents="none"
       accessible
       accessibilityLabel="A library room seen from the doorway: five bookcases full of books, two along the side walls and three against the back wall. Each bookcase belongs to a friend and has a name plaque with a round photo on top: Maja, Tom, Elin, Sam and Noor.">
-      <View style={[styles.room, { left: (width - W) / 2, top: (H * k - H) / 2, transform: [{ scale: k }] }]}>
-        <Ceiling />
-        <BackWall />
-        <Floor />
-        <SideWall side={-1} />
-        <SideWall side={1} />
-        <BackCase friend={TOM} x={-BACK_CASE.spacing} />
-        <BackCase friend={ELIN} x={0} />
-        <BackCase friend={SAM} x={BACK_CASE.spacing} />
-        <SideCase friend={MAJA} side={-1} />
-        <SideCase friend={NOOR} side={1} />
-        <Lamp />
-      </View>
+      {reached && width > 0 && (
+        <View style={[styles.room, { left: (width - W) / 2, top: (H * k - H) / 2, transform: [{ scale: k }] }]}>
+          <Ceiling />
+          <BackWall />
+          <Floor />
+          <SideWall side={-1} />
+          <SideWall side={1} />
+          <BackCase friend={TOM} x={-BACK_CASE.spacing} />
+          <BackCase friend={ELIN} x={0} />
+          <BackCase friend={SAM} x={BACK_CASE.spacing} />
+          <SideCase friend={MAJA} side={-1} />
+          <SideCase friend={NOOR} side={1} />
+          <Lamp />
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  frame: { width: '100%', maxWidth: 432, alignSelf: 'center', borderRadius: 14, overflow: 'hidden', backgroundColor: '#1a120c' },
+  frame: { width: '100%', maxWidth: 432, aspectRatio: W / H, alignSelf: 'center', borderRadius: 14, overflow: 'hidden', backgroundColor: '#1a120c' },
   room: { position: 'absolute', width: W, height: H },
   shelfShadow: { position: 'absolute', top: 0, left: 0, right: 0, height: 10 },
   books: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 1, paddingHorizontal: 2 },

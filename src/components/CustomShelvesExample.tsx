@@ -195,7 +195,7 @@ export function CustomShelvesExample() {
       style={styles.row}
       pointerEvents="none"
       accessible
-      accessibilityLabel={`The same bookcase in ${FINISHES.map((f) => f.name.toLowerCase()).join(', ')}, with a plant, a framed picture, a bookend, a candle and a globe among the books. ${SELECTED} is chosen.`}>
+      accessibilityLabel={`The same bookcase in oak, walnut and painted wood, with a plant, a framed picture, a bookend, a candle and a globe among the books. ${SELECTED} is chosen.`}>
       {FINISHES.map((finish) => {
         const chosen = finish.name === SELECTED;
         return (
