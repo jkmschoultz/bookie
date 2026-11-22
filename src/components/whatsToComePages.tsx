@@ -61,7 +61,7 @@ export const WHATS_TO_COME_PAGES: WhatsToComePage[] = [
     tag: LATER,
     icon: '🪵',
     title: 'Make your shelves yours',
-    body: 'Choose a wood style and add plants and other small things between your books.',
+    body: 'Choose wood, metal or glass, and place plants and other small things where you like.',
     visual: <CustomShelvesExample />,
   },
   {
