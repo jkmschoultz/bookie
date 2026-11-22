@@ -65,8 +65,8 @@ const FADE_MS = 450;
 const STEP_MS = 1500;
 const HOLD_MS = 900;
 const LOOP_MS = FADE_MS + STEPS * STEP_MS + HOLD_MS + FADE_MS;
-/** With reduced motion, the picture rests here: one step in, between swipes. */
-const STILL_MS = FADE_MS + STEP_MS * 0.97;
+/** With reduced motion, the picture rests here: part way into the first step, where every near plaque is whole. */
+const STILL_MS = FADE_MS + STEP_MS * 0.55;
 /** How far a drag on the picture walks, per point dragged. */
 const DRAG_WALK = 2.2;
 
@@ -448,6 +448,10 @@ export function FriendsLibraryHallway() {
   const walk = useDerivedValue(() => (manual.value ? manualWalk.value : walkAt(clock.value)));
 
   const drag = usePanGesture({
+    // On the web, leave sideways swipes to the browser, so they still turn the page. Gesture handler reads this from the
+    // config, but its types leave it out.
+    // @ts-expect-error touchAction is a web-only gesture option missing from PanGestureConfig
+    touchAction: 'pan-x',
     activeOffsetY: [-8, 8],
     failOffsetX: [-12, 12],
     onActivate: () => {
@@ -497,7 +501,7 @@ export function FriendsLibraryHallway() {
   const darkness = useAnimatedStyle(() => ({ opacity: Math.max(dim.value, manual.value ? 0 : fadeAt(clock.value)) }));
 
   return (
-    <GestureDetector gesture={drag} touchAction="pan-x">
+    <GestureDetector gesture={drag}>
       <View
         style={styles.frame}
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}

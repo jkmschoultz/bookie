@@ -501,7 +501,7 @@ export function CustomShelvesExample() {
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       pointerEvents="none"
       accessible
-      accessibilityLabel="A bookcase that changes between oak, walnut, painted, metal and glass, each with its own ornaments in its own places: a trailing plant and bookends, a candle, a framed picture and a vase, a cactus, a globe and a pile of books. Below it, a tray of ornaments, with the ones in use marked; one lifts from the tray and settles onto a shelf.">
+      accessibilityLabel="A bookcase that changes between oak, walnut, painted, metal and glass, each with its own ornaments in its own places: a trailing plant, a bookend, candles, a framed picture, a vase, a cactus, a potted plant, a globe and a pile of books. Below it, a tray of ornaments, with the ones in use marked; one lifts from the tray and settles onto a shelf.">
       {reached && width > 0 && (
         <View style={[styles.canvas, { left: (width - W) / 2, top: (H * k - H) / 2, transform: [{ scale: k }] }]}>
           <Chips clock={clock} />
