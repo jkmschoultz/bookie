@@ -1,4 +1,14 @@
-import { markOnboardingSeen, seenTourVersion, TOUR_VERSION, tourSteps, whatsNewMessage, type TourStepInfo } from '../onboarding';
+import {
+  markOnboardingSeen,
+  markWhatsToComeSeen,
+  seenTourVersion,
+  shouldShowWhatsToCome,
+  TOUR_VERSION,
+  tourSteps,
+  whatsNewMessage,
+  whatsToComeSeen,
+  type TourStepInfo,
+} from '../onboarding';
 
 const mockStore = new Map<string, string>();
 jest.mock('expo-sqlite/kv-store', () => ({
@@ -66,5 +76,63 @@ describe('whatsNewMessage', () => {
     expect(whatsNewMessage(['Books you own', 'Keep it on your home screen', 'What the spines mean'])).toBe(
       'The welcome tour has 3 new things in it. Want a look?',
     );
+  });
+});
+
+describe('recordAppOpen', () => {
+  // Each launch starts with a fresh copy of the module, as the app does.
+  const launch = () => {
+    let mod!: typeof import('../onboarding');
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      mod = require('../onboarding');
+    });
+    return mod.recordAppOpen;
+  };
+
+  it('counts the first open as 1', async () => {
+    expect(await launch()()).toBe(1);
+  });
+
+  it('counts each launch once, however often it is asked', async () => {
+    const record = launch();
+    expect(await record()).toBe(1);
+    expect(await record()).toBe(1);
+    expect(await launch()()).toBe(2);
+    expect(await launch()()).toBe(3);
+  });
+});
+
+describe('shouldShowWhatsToCome', () => {
+  const ready = { opens: 3, books: 1, seen: false, tourOffered: false };
+
+  it('shows from the third open to someone with a book', () => {
+    expect(shouldShowWhatsToCome(ready)).toBe(true);
+    expect(shouldShowWhatsToCome({ ...ready, opens: 7 })).toBe(true);
+  });
+
+  it('waits until the third open', () => {
+    expect(shouldShowWhatsToCome({ ...ready, opens: 1 })).toBe(false);
+    expect(shouldShowWhatsToCome({ ...ready, opens: 2 })).toBe(false);
+  });
+
+  it('waits until there is at least one book', () => {
+    expect(shouldShowWhatsToCome({ ...ready, books: 0 })).toBe(false);
+  });
+
+  it('never shows again once it has been seen', () => {
+    expect(shouldShowWhatsToCome({ ...ready, seen: true })).toBe(false);
+  });
+
+  it('stays out of the way of the welcome tour and its "What\'s new"', () => {
+    expect(shouldShowWhatsToCome({ ...ready, tourOffered: true })).toBe(false);
+  });
+});
+
+describe('whatsToComeSeen', () => {
+  it('is false until it has been shown or closed, then true', async () => {
+    expect(await whatsToComeSeen()).toBe(false);
+    await markWhatsToComeSeen();
+    expect(await whatsToComeSeen()).toBe(true);
   });
 });

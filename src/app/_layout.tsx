@@ -45,6 +45,7 @@ export default function RootLayout() {
                     <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
                     <Stack.Screen name="move-in" options={{ headerShown: false }} />
                     <Stack.Screen name="welcome" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+                    <Stack.Screen name="whats-to-come" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
                     <Stack.Screen name="add/index" options={{ title: 'Add books', presentation: 'modal' }} />
                     <Stack.Screen name="add/search" options={{ title: 'Search' }} />
                     <Stack.Screen name="add/scan" options={{ title: 'Scan barcode' }} />
