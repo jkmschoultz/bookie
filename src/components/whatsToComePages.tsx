@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import {
   BookClubExample,
+  CustomBookshelfExample,
   FriendsLibraryExample,
   ReadingCalendarExample,
   SuggestedReadingExample,
@@ -32,7 +33,7 @@ export const WHATS_TO_COME_PAGES: WhatsToComePage[] = [
     tag: LATER,
     icon: '👥',
     title: 'Friends’ library',
-    body: 'A shared room of bookcases, where each shelf belongs to a friend. Sharing would need optional cloud storage, and keeping your library on this device only stays an option.',
+    body: 'Take a bird’s-eye look around a shared library. Every bookcase belongs to a different friend, with their own bookshelves. Sharing would need optional cloud storage, and keeping your library on this device only stays an option.',
     visual: <FriendsLibraryExample />,
   },
   {
@@ -58,9 +59,16 @@ export const WHATS_TO_COME_PAGES: WhatsToComePage[] = [
   },
   {
     tag: LATER,
+    icon: '🪵',
+    title: 'Make your bookshelf yours',
+    body: 'Pick a wood finish, from warm oak to dark walnut, then add decorative touches to make your reading nook feel like home.',
+    visual: <CustomBookshelfExample />,
+  },
+  {
+    tag: LATER,
     icon: '🗓️',
     title: 'Reading calendar',
-    body: 'A suggested reading plan that spreads your books over the days of a month, so you know how much to read each day.',
+    body: 'A suggested reading plan that spreads your books over the days of a month, with each book’s cover marking its reading days.',
     visual: <ReadingCalendarExample />,
   },
 ];
