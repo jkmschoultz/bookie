@@ -33,7 +33,7 @@ export const WHATS_TO_COME_PAGES: WhatsToComePage[] = [
     tag: LATER,
     icon: '👥',
     title: 'Friends’ library',
-    body: 'Look into a shared library from above the entrance: rows of double-sided bookcases sit in two columns around a central aisle, and each bookcase belongs to a friend. Sharing would need optional cloud storage, and keeping your library on this device only stays an option.',
+    body: 'A shared library room where each bookcase belongs to a friend. Sharing would need optional cloud storage, and keeping your library on this device only stays an option.',
     visual: <FriendsLibraryRoom />,
   },
   {
