@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 /** Append-only. Each entry runs once, tracked via PRAGMA user_version. */
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   `
   CREATE TABLE books (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +32,20 @@ const MIGRATIONS: string[] = [
   `,
   `
   ALTER TABLE books ADD COLUMN cover_palette TEXT;
+  `,
+  // For syncing with an account: an id that's the same on every device (a random UUID), when the book last changed
+  // (ms), deletions kept as tombstones until they've been sent, and whether there's a change still to send.
+  `
+  ALTER TABLE books ADD COLUMN uid TEXT;
+  ALTER TABLE books ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE books ADD COLUMN deleted_at INTEGER;
+  ALTER TABLE books ADD COLUMN dirty INTEGER NOT NULL DEFAULT 1;
+  UPDATE books SET
+    uid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' ||
+      substr('89ab', 1 + abs(random()) % 4, 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))),
+    updated_at = CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER);
+  CREATE UNIQUE INDEX idx_books_uid ON books(uid);
+  CREATE INDEX idx_books_dirty ON books(dirty);
   `,
 ];
 

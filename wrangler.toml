@@ -1,0 +1,29 @@
+# Cloudflare Pages settings for Bookie (project "mybookie"). While this file is here, it's the source of truth for the
+# project's bindings: `wrangler pages deploy` applies it, and settings changed in the dashboard are overwritten.
+# The API in functions/ runs as Pages Functions at /api on the same address as the web app.
+#
+# Two EU-only D1 databases: production (mybookie.pages.dev) uses bookie-prod; every other deploy (staging and PR
+# previews) shares bookie-staging. Paste their ids where it says REPLACE_WITH_... (see "Accounts and sync" in the
+# README). Until then CI leaves the databases out (scripts/d1-config.mjs) and the app stays device-only.
+name = "mybookie"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-01"
+
+# Local development (`npm run api:dev`) uses a local copy under .wrangler/, never the real databases.
+[[d1_databases]]
+binding = "DB"
+database_name = "bookie-staging"
+database_id = "0f226df3-50fd-4b66-a767-a19591e49a93"
+migrations_dir = "migrations"
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "bookie-staging"
+database_id = "0f226df3-50fd-4b66-a767-a19591e49a93"
+migrations_dir = "migrations"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "bookie-prod"
+database_id = "972fe6f1-cbee-4e39-8941-34a2e58d8bf5"
+migrations_dir = "migrations"

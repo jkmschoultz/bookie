@@ -8,6 +8,9 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "@shared/*": [
+        "./shared/*"
       ]
     },
     "types": [
@@ -19,5 +22,11 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "server",
+    "functions",
+    "dist"
   ]
 }

@@ -58,7 +58,8 @@
           "photosPermission": "Bookie lets you pick a photo to use as a book cover."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

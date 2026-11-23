@@ -4,9 +4,12 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~58.0.27",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.1.0",
     "expo": "^58.0.0",
     "expo-camera": "~58.0.14",
     "expo-constants": "~58.0.15",
+    "expo-crypto": "~58.0.7",
     "expo-device": "~58.0.5",
     "expo-document-picker": "~58.0.4",
     "expo-file-system": "~58.0.13",
@@ -18,6 +21,7 @@
     "expo-linear-gradient": "~58.0.3",
     "expo-linking": "~58.0.16",
     "expo-router": "~58.0.30",
+    "expo-secure-store": "~58.0.2",
     "expo-sharing": "~58.0.22",
     "expo-splash-screen": "~58.0.13",
     "expo-sqlite": "~58.0.15",
@@ -40,6 +44,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261121.1",
     "@types/jest": "30.0.0",
     "@types/papaparse": "^5.5.2",
     "@types/react": "~19.3.0",
@@ -47,7 +52,8 @@
     "eslint-config-expo": "~58.0.0",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "wrangler": "4.161.0"
   },
   "scripts": {
     "start": "expo start",
@@ -57,15 +63,48 @@
     "lint": "expo lint",
     "test": "jest",
     "export:cloudflare": "expo export --platform web && node scripts/prepare-cloudflare.mjs",
-    "deploy:prod": "npm run export:cloudflare && npx wrangler@4.161.0 pages deploy dist --project-name mybookie --branch master",
-    "deploy:staging": "npm run export:cloudflare && npx wrangler@4.161.0 pages deploy dist --project-name mybookie --branch staging"
+    "deploy:prod": "npm run export:cloudflare && node scripts/pages-deploy.mjs master",
+    "deploy:staging": "npm run export:cloudflare && node scripts/pages-deploy.mjs staging",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p server/tsconfig.json",
+    "api:dev": "npm run export:cloudflare && wrangler d1 migrations apply bookie-staging --local && wrangler pages dev dist"
   },
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
   "jest": {
-    "preset": "jest-expo",
-    "testPathIgnorePatterns": [
-      "/node_modules/"
+    "projects": [
+      {
+        "displayName": "app",
+        "preset": "jest-expo",
+        "testPathIgnorePatterns": [
+          "/node_modules/",
+          "<rootDir>/server/",
+          "<rootDir>/shared/"
+        ]
+      },
+      {
+        "displayName": "api",
+        "testEnvironment": "node",
+        "roots": [
+          "<rootDir>/server",
+          "<rootDir>/shared"
+        ],
+        "testMatch": [
+          "**/__tests__/**/*.test.ts"
+        ],
+        "transform": {
+          "\\.ts$": [
+            "babel-jest",
+            {
+              "presets": [
+                "babel-preset-expo"
+              ]
+            }
+          ]
+        },
+        "moduleNameMapper": {
+          "^@/(.*)$": "<rootDir>/src/$1"
+        }
+      }
     ]
   }
 }

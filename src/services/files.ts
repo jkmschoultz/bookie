@@ -1,5 +1,5 @@
 import type { DocumentPickerAsset } from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
@@ -35,4 +35,11 @@ export async function saveJsonFile(name: string, text: string): Promise<void> {
   file.create({ overwrite: true });
   await file.write(text);
   await Sharing.shareAsync(file.uri, { mimeType, UTI: 'public.json', dialogTitle: 'Save your Bookie backup' });
+}
+
+/** Deletes cover photos saved on this device. Web keeps them inline in the database, so there's no folder to clear. */
+export function deleteCoverPhotos(): void {
+  if (Platform.OS === 'web') return;
+  const covers = new Directory(Paths.document, 'covers');
+  if (covers.exists) covers.delete();
 }

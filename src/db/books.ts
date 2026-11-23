@@ -1,6 +1,14 @@
+import { randomUUID } from 'expo-crypto';
 import type { SQLiteBindValue, SQLiteDatabase } from 'expo-sqlite';
 
+import { incomingBook, outgoingBook, wins, type SyncBook } from '@shared/books';
 import type { Book, NewBook } from '@/types';
+
+/*
+ * Every book also has a `uid`, the same on every device, for syncing with an account. Changes stamp `updated_at` and
+ * set `dirty` until they've been sent. Deleting keeps a tombstone (`deleted_at`) until that's been sent too; the shelf
+ * never sees tombstones. Without an account nothing is ever sent, and tombstones are cleared away (purgeTombstones).
+ */
 
 interface BookRow {
   id: number;
@@ -27,6 +35,10 @@ interface BookRow {
   date_started: string | null;
   date_finished: string | null;
   notes: string | null;
+  uid: string;
+  updated_at: number;
+  deleted_at: number | null;
+  dirty: number;
 }
 
 /** Book field → column name. The single source of truth for the mapping. */
@@ -93,15 +105,20 @@ function toValue(key: keyof NewBook, value: unknown): SQLiteBindValue {
 }
 
 export async function getAllBooks(db: SQLiteDatabase): Promise<Book[]> {
-  const rows = await db.getAllAsync<BookRow>('SELECT * FROM books');
+  const rows = await db.getAllAsync<BookRow>('SELECT * FROM books WHERE deleted_at IS NULL');
   return rows.map(fromRow);
 }
 
+const KEYS = Object.keys(COLUMNS) as (keyof NewBook)[];
+
+async function insertRow(db: SQLiteDatabase, book: NewBook, uid: string, updatedAt: number, dirty: boolean): Promise<number> {
+  const sql = `INSERT INTO books (${KEYS.map((k) => COLUMNS[k]).join(', ')}, uid, updated_at, dirty) VALUES (${KEYS.map(() => '?').join(', ')}, ?, ?, ?)`;
+  const res = await db.runAsync(sql, [...KEYS.map((k) => toValue(k, book[k])), uid, updatedAt, dirty ? 1 : 0]);
+  return res.lastInsertRowId;
+}
+
 export async function insertBook(db: SQLiteDatabase, book: NewBook): Promise<Book> {
-  const keys = Object.keys(COLUMNS) as (keyof NewBook)[];
-  const sql = `INSERT INTO books (${keys.map((k) => COLUMNS[k]).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`;
-  const res = await db.runAsync(sql, keys.map((k) => toValue(k, book[k])));
-  return { ...book, id: res.lastInsertRowId };
+  return { ...book, id: await insertRow(db, book, randomUUID(), Date.now(), true) };
 }
 
 export async function insertBooks(db: SQLiteDatabase, books: NewBook[]): Promise<Book[]> {
@@ -112,29 +129,101 @@ export async function insertBooks(db: SQLiteDatabase, books: NewBook[]): Promise
   return saved;
 }
 
+/** Marks a book changed: stamped now, or just after its last change if this device's clock is behind. */
+const CHANGED = 'updated_at = max(?, updated_at + 1), dirty = 1';
+
 export async function updateBook(db: SQLiteDatabase, id: number, patch: Partial<NewBook>): Promise<void> {
   const keys = (Object.keys(patch) as (keyof NewBook)[]).filter((k) => k in COLUMNS);
   if (!keys.length) return;
-  const sql = `UPDATE books SET ${keys.map((k) => `${COLUMNS[k]} = ?`).join(', ')} WHERE id = ?`;
-  await db.runAsync(sql, [...keys.map((k) => toValue(k, patch[k])), id]);
+  const sql = `UPDATE books SET ${keys.map((k) => `${COLUMNS[k]} = ?`).join(', ')}, ${CHANGED} WHERE id = ?`;
+  await db.runAsync(sql, [...keys.map((k) => toValue(k, patch[k])), Date.now(), id]);
 }
 
 export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM books WHERE id = ?', id);
+  await deleteBooks(db, [id]);
 }
 
 export async function deleteBooks(db: SQLiteDatabase, ids: number[]): Promise<void> {
   if (!ids.length) return;
-  await db.runAsync(`DELETE FROM books WHERE id IN (${ids.map(() => '?').join(', ')})`, ids);
+  const now = Date.now();
+  await db.runAsync(`UPDATE books SET deleted_at = ?, ${CHANGED} WHERE id IN (${ids.map(() => '?').join(', ')})`, [now, now, ...ids]);
 }
 
 export async function deleteAllBooks(db: SQLiteDatabase): Promise<void> {
-  await db.runAsync('DELETE FROM books');
-  // Restart ids from 1, as on a fresh install.
-  await db.runAsync("DELETE FROM sqlite_sequence WHERE name = 'books'");
+  const now = Date.now();
+  await db.runAsync(`UPDATE books SET deleted_at = ?, ${CHANGED} WHERE deleted_at IS NULL`, [now, now]);
 }
 
 export async function findByIsbn(db: SQLiteDatabase, isbn13: string): Promise<Book | null> {
-  const row = await db.getFirstAsync<BookRow>('SELECT * FROM books WHERE isbn13 = ?', isbn13);
+  const row = await db.getFirstAsync<BookRow>('SELECT * FROM books WHERE isbn13 = ? AND deleted_at IS NULL', isbn13);
   return row ? fromRow(row) : null;
+}
+
+/** Changes not yet sent to the account, oldest first. Sample books never leave the device. */
+export async function pendingChanges(db: SQLiteDatabase, limit: number): Promise<SyncBook[]> {
+  const rows = await db.getAllAsync<BookRow>("SELECT * FROM books WHERE dirty = 1 AND source != 'sample' ORDER BY updated_at LIMIT ?", limit);
+  return rows.map((r) => {
+    const { id, ...book } = fromRow(r);
+    return { id: r.uid, updatedAt: r.updated_at, deletedAt: r.deleted_at, book: r.deleted_at == null ? outgoingBook(book) : null };
+  });
+}
+
+/** Marks sent changes as sent, unless the book changed again while they were on their way. */
+export async function markSent(db: SQLiteDatabase, sent: Pick<SyncBook, 'id' | 'updatedAt'>[]): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    for (const c of sent) await db.runAsync('UPDATE books SET dirty = 0 WHERE uid = ? AND updated_at = ?', c.id, c.updatedAt);
+  });
+}
+
+/**
+ * Takes in changes from the account, keeping whichever version of each book is newest. A local edit that's newer
+ * stays, to be sent next. Returns how many books changed here.
+ */
+export async function applyRemote(db: SQLiteDatabase, changes: SyncBook[]): Promise<number> {
+  let applied = 0;
+  await db.withTransactionAsync(async () => {
+    for (const remote of changes) {
+      const local = await db.getFirstAsync<Pick<BookRow, 'id' | 'updated_at' | 'cover_url'>>('SELECT id, updated_at, cover_url FROM books WHERE uid = ?', remote.id);
+      const current = local && { updatedAt: local.updated_at };
+      if (!wins(remote, current)) {
+        // The same version came back: nothing left to send.
+        if (local && local.updated_at === remote.updatedAt) await db.runAsync('UPDATE books SET dirty = 0 WHERE id = ?', local.id);
+        continue;
+      }
+      applied++;
+      if (remote.deletedAt != null || !remote.book) {
+        if (local) await db.runAsync('DELETE FROM books WHERE id = ?', local.id);
+        continue;
+      }
+      const book = incomingBook(remote.book, local && { coverUrl: local.cover_url });
+      if (!local) {
+        await insertRow(db, book, remote.id, remote.updatedAt, false);
+        continue;
+      }
+      const sql = `UPDATE books SET ${KEYS.map((k) => `${COLUMNS[k]} = ?`).join(', ')}, updated_at = ?, deleted_at = NULL, dirty = 0 WHERE id = ?`;
+      await db.runAsync(sql, [...KEYS.map((k) => toValue(k, book[k])), remote.updatedAt, local.id]);
+    }
+  });
+  return applied;
+}
+
+/** Books on the shelf that would sync: not deleted, not samples. */
+export async function countSyncable(db: SQLiteDatabase): Promise<number> {
+  const row = await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM books WHERE deleted_at IS NULL AND source != 'sample'");
+  return row?.n ?? 0;
+}
+
+/** Removes every book from this device for good, tombstones too: before taking in an account's library instead. */
+export async function clearLibrary(db: SQLiteDatabase): Promise<void> {
+  await db.runAsync('DELETE FROM books');
+}
+
+/** Everything on this device is to be sent, e.g. when signing in to an account for the first time here. */
+export async function markAllUnsent(db: SQLiteDatabase): Promise<void> {
+  await db.runAsync('UPDATE books SET dirty = 1');
+}
+
+/** Clears away tombstones that have been sent, or all of them when there's no account to send them to. */
+export async function purgeTombstones(db: SQLiteDatabase, all: boolean): Promise<void> {
+  await db.runAsync(`DELETE FROM books WHERE deleted_at IS NOT NULL AND (dirty = 0 OR source = 'sample' OR ?)`, all ? 1 : 0);
 }
