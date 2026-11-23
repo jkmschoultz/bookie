@@ -34,7 +34,8 @@ function showBook(book: Book) {
 }
 
 /** Opened from the Friends hallway, which has turned to face this friend's bookcase: the shelf fades in over it. */
-const FROM_HALLWAY = FadeIn.duration(150).reduceMotion(ReduceMotion.Never);
+const FROM_HALLWAY = FadeIn.duration(450).reduceMotion(ReduceMotion.Never);
+const BACK_TO_HALLWAY = FadeOut.duration(450).reduceMotion(ReduceMotion.Never);
 
 /**
  * A friend's shelf, read-only: their books on a bookcase like yours, by genre. What's changed on it since you last
@@ -88,7 +89,10 @@ export default function FriendShelfScreen() {
     ]);
 
   return (
-    <Animated.View style={styles.screen} entering={from === 'hallway' ? FROM_HALLWAY : undefined}>
+    <Animated.View
+      style={styles.screen}
+      entering={from === 'hallway' ? FROM_HALLWAY : undefined}
+      exiting={from === 'hallway' ? BACK_TO_HALLWAY : undefined}>
       <Stack.Screen
         options={{
           title: title ? `${title}’s shelf` : 'Shelf',

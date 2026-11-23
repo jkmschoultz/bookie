@@ -780,7 +780,19 @@ const Floor = memo(function Floor({ walk, cam, length }: { walk: SharedValue<num
           <View key={i} style={[styles.board, { width: board, backgroundColor: i % 3 === 0 ? '#7d522f' : i % 3 === 1 ? '#8a5c35' : '#734a2a' }]} />
         ))}
       </View>
-      <View style={styles.runner} />
+      <LinearGradient
+        colors={['#481f22', '#742d2b', '#542124']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.runner}
+      />
+      <Crosswise walk={walk} every={180}>
+        {Array.from({ length: Math.ceil(all / 180) + 1 }, (_, i) => (
+          <View key={i} style={[styles.runnerMotif, { top: i * 180 + 80 }]}>
+            <View style={styles.runnerMotifInner} />
+          </View>
+        ))}
+      </Crosswise>
       <Crosswise walk={walk} every={JOINT}>
         {Array.from({ length: Math.ceil(all / JOINT) + 1 }, (_, i) => (
           <View key={i} style={[styles.joint, { top: i * JOINT }]} />
@@ -837,7 +849,12 @@ const SideWall = memo(function SideWall({ walk, cam, side, length }: { walk: Sha
         { rotateY: left ? '90deg' : '-90deg' },
         { translateX: left ? (length - NEAR_Z) / 2 : (NEAR_Z - length) / 2 },
       ]}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#4b3526' }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#34473b' }]} />
+      <LinearGradient
+        colors={['rgba(218,190,135,0.1)', 'rgba(18,27,21,0.04)', 'rgba(8,14,11,0.2)']}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={styles.wallRail} />
       {/* Above the bookcases, where the wall is bare, moving along with them. */}
       {season === 'christmas' && <Garland length={all} top={(CASE_TOP - CEILING) * 0.32} walk={walk} side={side} />}
@@ -1458,12 +1475,14 @@ const styles = StyleSheet.create({
   name: { color: Wood.brassText, fontFamily: Fonts.serif, fontSize: 13, fontWeight: '700' },
   boards: { ...StyleSheet.absoluteFill, flexDirection: 'row' },
   board: { height: '100%', borderRightWidth: 1, borderRightColor: 'rgba(30,16,6,0.55)' },
-  runner: { position: 'absolute', left: 116, right: 116, top: 0, bottom: 0, backgroundColor: '#6e2a22', borderLeftWidth: 3, borderRightWidth: 3, borderColor: '#c99a4a' },
+  runner: { position: 'absolute', left: 116, right: 116, top: 0, bottom: 0, borderLeftWidth: 3, borderRightWidth: 3, borderColor: '#c99a4a' },
+  runnerMotif: { position: 'absolute', left: HALF_WIDTH - 9, width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.2, borderColor: 'rgba(221,184,102,0.7)', transform: [{ rotate: '45deg' }] },
+  runnerMotifInner: { width: 6, height: 6, borderWidth: 1, borderColor: 'rgba(238,207,138,0.75)', backgroundColor: 'rgba(44,18,21,0.45)' },
   crosswise: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   joint: { position: 'absolute', left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(30,16,6,0.5)' },
   caseShadow: { position: 'absolute', width: 28, top: 0, bottom: 0 },
   beam: { position: 'absolute', left: 0, right: 0, height: 14, backgroundColor: '#3b281a', borderBottomWidth: 2, borderBottomColor: '#1c120b' },
-  wallRail: { position: 'absolute', left: 0, right: 0, top: 70, height: 5, backgroundColor: '#5e4330' },
+  wallRail: { position: 'absolute', left: 0, right: 0, top: 70, height: 7, backgroundColor: '#67513a', borderTopWidth: 1, borderTopColor: 'rgba(220,184,119,0.55)', borderBottomWidth: 2, borderBottomColor: 'rgba(16,23,17,0.55)' },
   window: { position: 'absolute', left: 120, right: 120, top: '21%', bottom: '36%', borderTopLeftRadius: 50, borderTopRightRadius: 50, overflow: 'hidden', borderWidth: 6, borderColor: '#3a2817' },
   moon: { position: 'absolute', top: 30, right: 22, width: 18, height: 18, borderRadius: 9, backgroundColor: '#f1e8c8' },
   mullionV: { position: 'absolute', top: 0, bottom: 0, left: '50%', width: 4, marginLeft: -2, backgroundColor: '#3a2817' },
