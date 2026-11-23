@@ -67,7 +67,7 @@ export default function BookshelfScreen() {
       else if (fresh.length) {
         // Asked once per tour version, whichever way they answer.
         await markOnboardingSeen();
-        alert('Psst, Bookie has been updated', whatsNewMessage(fresh.map((s) => s.title)), [
+        alert('Psst, Bookie has been updated', whatsNewMessage(fresh), [
           { text: 'Not now', style: 'cancel' },
           { text: 'Show me', onPress: () => router.push({ pathname: '/welcome', params: { since: String(seen) } }) },
         ]);

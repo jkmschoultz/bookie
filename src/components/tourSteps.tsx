@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Platform } from 'react-native';
 
+import { FriendsLibraryHallway } from '@/components/FriendsLibraryHallway';
 import { HomeAnimation } from '@/components/HomeAnimation';
 import { HomeScreenGuide } from '@/components/HomeScreenGuide';
 import { OwnershipExample } from '@/components/OwnershipExample';
@@ -15,6 +16,8 @@ export interface TourStep extends TourStepInfo {
   points: string[];
   /** Shown under the points. */
   visual?: ReactNode;
+  /** What the "Psst" alert says about this step to someone who has seen the tour before, if it's not just its title. */
+  news?: string;
 }
 
 /** The welcome tour, in order. Give a new or changed step the current `TOUR_VERSION` as its `since`. */
@@ -81,12 +84,23 @@ export const TOUR_STEPS: TourStep[] = [
     webOnly: true,
   },
   {
+    since: 5,
+    icon: '👥',
+    title: 'Friends’ library',
+    points: [
+      'Each friend has a bookcase in a library hallway. The more friends you add, the longer it gets.',
+      'An account is optional and only needed for friends. Keeping your library on this device only is still the default.',
+    ],
+    visual: <FriendsLibraryHallway />,
+    news: 'Bookie has friends now: a library hallway with a bookcase for each friend. Want a look?',
+  },
+  {
     since: 1,
     icon: '🔒',
-    title: 'Your library stays with you',
+    title: 'Stay offline, or sync your account',
     points: [
-      'Everything is stored on this device only, with no account and no cloud.',
-      'Use Settings → Export backup now and then to keep a copy somewhere safe.',
+      'Your library stays on this device by default, and you never need an account to use Bookie.',
+      'Or sign up to sync it across your devices. Either way, use Settings → Export backup now and then to keep a copy somewhere safe.',
     ],
   },
 ];

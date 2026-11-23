@@ -9,8 +9,8 @@ import { Colors, Fonts } from '@/constants/theme';
 import { markWhatsToComeSeen } from '@/library/onboarding';
 
 /**
- * A click-through preview of ideas for later, plus the friends' library, which is here now and has a button to open
- * it. Offered once on its own (see `shouldShowWhatsToCome`), and any time from Settings.
+ * A click-through preview of ideas for later. Offered once on its own (see `shouldShowWhatsToCome`), and any time from
+ * Settings.
  */
 export default function WhatsToComeScreen() {
   const insets = useSafeAreaInsets();
