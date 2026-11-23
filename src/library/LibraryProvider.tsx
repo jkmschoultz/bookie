@@ -1,9 +1,9 @@
-import { Directory, Paths } from 'expo-file-system';
 import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Platform } from 'react-native';
 
+import { notifyLocalChange } from '@/account/localChanges';
 import * as repo from '@/db/books';
+import { deleteCoverPhotos } from '@/services/files';
 import type { Book, NewBook, ReadStatus } from '@/types';
 
 import type { DuplicateMerge } from './duplicates';
@@ -24,6 +24,8 @@ interface Library {
   /** Delete every book and any saved cover photos. */
   eraseLibrary: () => Promise<void>;
   findByIsbn: (isbn13: string) => Book | undefined;
+  /** Read the library again, after sync changed it. */
+  reload: () => Promise<void>;
 }
 
 const LibraryContext = createContext<Library | null>(null);
@@ -37,6 +39,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     latest.current = books;
   }, [books]);
 
+  const reload = useCallback(async () => {
+    setBooks(await repo.getAllBooks(db));
+  }, [db]);
+
   useEffect(() => {
     repo.getAllBooks(db).then((all) => {
       setBooks(all);
@@ -48,6 +54,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     async (book: NewBook) => {
       const saved = await repo.insertBook(db, book);
       setBooks((prev) => [...prev, saved]);
+      notifyLocalChange();
       return saved;
     },
     [db],
@@ -57,6 +64,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     async (list: NewBook[]) => {
       const saved = await repo.insertBooks(db, list);
       setBooks((prev) => [...prev, ...saved]);
+      notifyLocalChange();
       return saved;
     },
     [db],
@@ -69,6 +77,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       if (current && patch.coverUrl !== undefined && patch.coverUrl !== current.coverUrl) patch = { ...patch, coverPalette: null };
       await repo.updateBook(db, id, patch);
       setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+      notifyLocalChange();
     },
     [db],
   );
@@ -77,6 +86,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     async (id: number) => {
       await repo.deleteBook(db, id);
       setBooks((prev) => prev.filter((b) => b.id !== id));
+      notifyLocalChange();
     },
     [db],
   );
@@ -91,6 +101,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const patches = new Map(merges.map((m) => [m.keep.id, m.patch]));
       const removed = new Set(ids);
       setBooks((prev) => prev.filter((b) => !removed.has(b.id)).map((b) => (patches.has(b.id) ? { ...b, ...patches.get(b.id) } : b)));
+      notifyLocalChange();
       return ids.length;
     },
     [db],
@@ -98,12 +109,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   const eraseLibrary = useCallback(async () => {
     await repo.deleteAllBooks(db);
-    // Web keeps cover photos inline in the database, so there's no folder to clear.
-    if (Platform.OS !== 'web') {
-      const covers = new Directory(Paths.document, 'covers');
-      if (covers.exists) covers.delete();
-    }
+    deleteCoverPhotos();
     setBooks([]);
+    notifyLocalChange();
   }, [db]);
 
   useCoverPalettes(books, latest, updateBook);
@@ -121,12 +129,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       removeBook,
       mergeDuplicates,
       eraseLibrary,
+      reload,
       setStatus: async (id, status) => {
         const book = byId.get(id);
         if (book) await updateBook(id, statusPatch(book, status));
       },
     };
-  }, [books, loaded, addBook, addBooks, updateBook, removeBook, mergeDuplicates, eraseLibrary]);
+  }, [books, loaded, addBook, addBooks, updateBook, removeBook, mergeDuplicates, eraseLibrary, reload]);
 
   return <LibraryContext value={value}>{children}</LibraryContext>;
 }

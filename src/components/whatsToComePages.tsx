@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import type { ReactNode } from 'react';
 
 import {
@@ -7,7 +8,6 @@ import {
   VinylAndDvdExample,
 } from '@/components/ComingLaterExamples';
 import { CustomShelvesExample } from '@/components/CustomShelvesExample';
-import { FriendsLibraryHallway } from '@/components/FriendsLibraryHallway';
 
 export interface WhatsToComePage {
   /** The small tag over the title. */
@@ -17,24 +17,19 @@ export interface WhatsToComePage {
   body: string;
   /** Shown under the body. */
   visual?: ReactNode;
+  /** For an idea that's here now: a button to open it. */
+  action?: { label: string; href: Href };
 }
 
 const LATER = 'Coming later';
 
-/** The "What's to come" preview, in order: ideas for later, none of which work yet. */
+/** The "What's to come" preview: ideas for later. */
 export const WHATS_TO_COME_PAGES: WhatsToComePage[] = [
   {
     tag: 'A preview',
     icon: '🔭',
     title: 'What’s to come',
     body: 'Here are some ideas for where Bookie is heading. None of them work yet, and plans may change along the way.',
-  },
-  {
-    tag: LATER,
-    icon: '👥',
-    title: 'Friends’ library',
-    body: 'A shared library hallway where each bookcase belongs to a friend. The more friends you add, the longer it gets. Sharing would need optional cloud storage, and keeping your library on this device only stays an option.',
-    visual: <FriendsLibraryHallway />,
   },
   {
     tag: LATER,

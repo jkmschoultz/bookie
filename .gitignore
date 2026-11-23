@@ -44,3 +44,9 @@ example
 
 # Cloudflare Wrangler's local state
 .wrangler/
+
+# Local secrets for wrangler pages dev
+.dev.vars
+
+# Left by scripts/pages-deploy.mjs if it's interrupted
+wrangler.toml.bak

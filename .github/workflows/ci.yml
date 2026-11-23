@@ -1,7 +1,8 @@
 name: CI
 
 # Every pull request into master is tested, test-built, typechecked and linted, then deployed to Cloudflare and the
-# address is posted on the PR. The oldest open PR holds staging (staging.mybookie.pages.dev); every other PR gets a
+# address is posted on the PR. Each deploy includes the API (functions/, as Pages Functions at /api) and first brings
+# its D1 database up to date (migrations/): bookie-staging for staging and previews, bookie-prod for production. The oldest open PR holds staging (staging.mybookie.pages.dev); every other PR gets a
 # throwaway preview address under its branch name. Once something lands on master (a merge or a direct push) and
 # the tests and build pass, that same build is deployed to production on Cloudflare (mybookie.pages.dev). The old
 # address on Expo (bookie.expo.app) is frozen on its last deploy, which points people here: see the README.
@@ -93,6 +94,11 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      # The API runs on Cloudflare Workers, with its own types.
+      - name: Typecheck the API
+        if: ${{ !cancelled() }}
+        run: npx tsc --noEmit -p server/tsconfig.json
+
       # Runs even if the typecheck failed, so one run reports both.
       - name: Lint
         if: ${{ !cancelled() }}
@@ -124,6 +130,11 @@ jobs:
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
         with:
           node-version: 24
+          cache: npm
+
+      # The deploy bundles the API in functions/ with its packages.
+      - run: npm ci
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
 
       - uses: actions/download-artifact@v4
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
@@ -163,6 +174,18 @@ jobs:
             core.setOutput('branch', holdsStaging ? 'staging' : own);
             core.setOutput('staging', holdsStaging ? 'true' : 'false');
             core.setOutput('holder', oldest ? String(oldest.number) : '');
+
+      # Staging and every preview share the bookie-staging database. Until its id is in wrangler.toml this only warns,
+      # and the deploy goes ahead without a database (accounts then say they aren't available there).
+      - name: Check the staging database
+        id: d1
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: node scripts/d1-config.mjs preview
+
+      # Migrations first, so the API that's about to go live finds the tables it expects.
+      - name: Update the staging database
+        if: steps.d1.outputs.configured == 'true'
+        run: npx --yes "$WRANGLER" d1 migrations apply bookie-staging --remote --env preview
 
       - name: Deploy
         id: deploy
@@ -233,11 +256,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
+
+      # The deploy bundles the API in functions/ with its packages.
+      - run: npm ci
 
       - uses: actions/download-artifact@v4
         with:
           name: web-build
           path: dist
+
+      # Until bookie-prod's id is in wrangler.toml this only warns, and production deploys without a database.
+      - name: Check the production database
+        id: d1
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: node scripts/d1-config.mjs production
+
+      # Migrations first, so the API that's about to go live finds the tables it expects.
+      - name: Update the production database
+        if: steps.d1.outputs.configured == 'true'
+        run: npx --yes "$WRANGLER" d1 migrations apply bookie-prod --remote --env production
 
       # Cloudflare skips node_modules folders, where Expo puts SQLite's .wasm: see scripts/prepare-cloudflare.mjs.
       - name: Deploy to Cloudflare

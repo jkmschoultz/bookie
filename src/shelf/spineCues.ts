@@ -2,7 +2,8 @@ import { Colors, Wood } from '@/constants/theme';
 import type { Book } from '@/types';
 
 import { hashUnit } from './hash';
-import { contrastText, relativeLuminance, UNOWNED_OPACITY } from './spineStyle';
+import { contrastRatio, CREAM, INK, MIN_CONTRAST, mix, overlaps, relativeLuminance, type Box } from './spineBoxes';
+import { UNOWNED_OPACITY } from './spineStyle';
 
 /** What a spine shows about its book's status and whether you own it, one real-book cue each (drawn in Spine.tsx). */
 export interface SpineCues {
@@ -71,7 +72,35 @@ const WANDER = 1.2;
  * that wander a little and sometimes break off, the first one long through the middle and the others shorter.
  * Placed differently on every book but always the same on one, and fewer on a thin spine.
  */
-export function creases(id: number, width: number, height: number): CreaseSegment[][] {
+export function creases(id: number, width: number, height: number, avoid: Box[] = []): CreaseSegment[][] {
+  return avoid.length ? placeCreases(id, width, height).map((c) => clearOf(c, avoid)).filter((c) => c.length) : placeCreases(id, width, height);
+}
+
+/** How close a crease may come to the text. */
+const CREASE_GAP = 1.5;
+/** Pieces shorter than this, left over after cutting around the text, are dropped. */
+const MIN_PIECE = 4;
+
+/** A crease with the stretches that would cross the title or author cut out, fading out where they're cut. */
+function clearOf(crease: CreaseSegment[], avoid: Box[]): CreaseSegment[] {
+  let pieces = crease;
+  for (const box of avoid) {
+    pieces = pieces.flatMap((p) => {
+      const span = { x: Math.min(p.x1, p.x2), y: p.y1, w: Math.abs(p.x2 - p.x1), h: p.y2 - p.y1 };
+      if (!overlaps(span, box, CREASE_GAP)) return [p];
+      const at = (y: number) => p.x1 + ((p.x2 - p.x1) * (y - p.y1)) / (p.y2 - p.y1 || 1);
+      const top = box.y - CREASE_GAP;
+      const bottom = box.y + box.h + CREASE_GAP;
+      const out: CreaseSegment[] = [];
+      if (top - p.y1 >= MIN_PIECE) out.push({ ...p, y2: top, x2: at(top), fadeEnd: true });
+      if (p.y2 - bottom >= MIN_PIECE) out.push({ ...p, y1: bottom, x1: at(bottom), fadeStart: true });
+      return out;
+    });
+  }
+  return pieces;
+}
+
+function placeCreases(id: number, width: number, height: number): CreaseSegment[][] {
   const seed = String(id);
   const r = (key: string) => hashUnit(seed, `crease-${key}`);
   const roll = r('count');
@@ -142,15 +171,12 @@ export const GHOST_FILL = 0.35;
  */
 export function ghostColors(color: string): { outline: string; text: string } {
   const fill = mix(Wood.backPanel[1], color, GHOST_FILL);
+  // Ink or cream as on other spines, or white or black when the see-through fill is a mid-tone neither reads on.
+  const best = (options: string[]) => options.reduce((a, b) => (contrastRatio(b, fill) > contrastRatio(a, fill) ? b : a));
+  const usual = best([INK, CREAM]);
+  const text = contrastRatio(usual, fill) >= MIN_CONTRAST ? usual : best(['#ffffff', '#000000']);
   return {
     outline: relativeLuminance(color) < 0.1 ? mix(color, Colors.text, 0.4) : color,
-    text: contrastText(fill),
+    text,
   };
-}
-
-function mix(a: string, b: string, t: number): string {
-  const pa = parseInt(a.slice(1), 16);
-  const pb = parseInt(b.slice(1), 16);
-  const channel = (shift: number) => Math.round(((pa >> shift) & 255) * (1 - t) + ((pb >> shift) & 255) * t);
-  return `#${((channel(16) << 16) | (channel(8) << 8) | channel(0)).toString(16).padStart(6, '0')}`;
 }

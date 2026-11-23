@@ -2,6 +2,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useAccount } from '@/account/AccountProvider';
+import { AccountSettings } from '@/components/account/AccountSettings';
 import { alert } from '@/components/alert';
 import { SupportNote } from '@/components/SupportNote';
 import { Colors } from '@/constants/theme';
@@ -23,20 +25,26 @@ export default function SettingsScreen() {
   const resetUi = useUi((s) => s.reset);
   const layoutMode = useUi((s) => s.layoutMode);
   const setLayoutMode = useUi((s) => s.setLayoutMode);
+  const { status, syncEnabled } = useAccount();
+  const syncing = status === 'signedIn' && syncEnabled;
 
   const erase = () =>
-    alert('Erase library?', `All ${books.length} books, ratings, notes and cover photos will be deleted. This can’t be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Erase',
-        style: 'destructive',
-        onPress: async () => {
-          await eraseLibrary();
-          resetUi();
-          router.dismissTo('/');
+    alert(
+      'Erase library?',
+      `All ${books.length} books, ratings, notes and cover photos will be deleted.${syncing ? ' They’re also removed from your account and your other devices.' : ''} This can’t be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Erase',
+          style: 'destructive',
+          onPress: async () => {
+            await eraseLibrary();
+            resetUi();
+            router.dismissTo('/');
+          },
         },
-      },
-    ]);
+      ],
+    );
 
   const removeDuplicates = () => {
     const merges = findDuplicates(books);
@@ -93,10 +101,13 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentInsetAdjustmentBehavior="automatic" alwaysBounceVertical contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Library</Text>
+      <Text style={styles.sectionTitle}>Account & sync</Text>
+      <AccountSettings />
+
+      <Text style={[styles.sectionTitle, styles.spaced]}>Library</Text>
       <View style={styles.card}>
         <Text style={styles.body}>
-          {books.length} {books.length === 1 ? 'book' : 'books'} on your shelves, stored on this device.
+          {books.length} {books.length === 1 ? 'book' : 'books'} on your shelves, stored on this device{syncing ? ' and in your account' : ''}.
         </Text>
         <Pressable style={styles.row} onPress={loadSample}>
           <Text style={styles.rowText}>Add the sample library</Text>
@@ -139,7 +150,7 @@ export default function SettingsScreen() {
         </Pressable>
         <Pressable style={styles.row} onPress={() => router.push('/whats-to-come')}>
           <Text style={styles.rowText}>What’s to come</Text>
-          <Text style={styles.rowHint}>A preview of ideas for later. None of them work yet.</Text>
+          <Text style={styles.rowHint}>A preview of ideas for later, and the friends’ library, which is here now.</Text>
         </Pressable>
       </View>
 
@@ -153,7 +164,9 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
       <Text style={styles.hint}>
-        Your library only lives on this device. Export a backup now and then, and keep it somewhere safe like Files or Drive.
+        {syncing
+          ? 'Your account keeps a copy of your library, but a backup of your own does no harm.'
+          : 'Your library only lives on this device. Export a backup now and then, and keep it somewhere safe like Files or Drive.'}{' '}
         Restoring adds the books from a backup and skips any already on your shelves. Photos you took for covers aren’t included.
       </Text>
 

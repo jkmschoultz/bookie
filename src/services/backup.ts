@@ -1,3 +1,4 @@
+import { portableCover } from '@shared/books';
 import { bookKey, emptyDraft, today, type Book, type NewBook } from '@/types';
 
 const VERSION = 1;
@@ -8,9 +9,6 @@ interface BackupFile {
   exportedAt: string;
   books: NewBook[];
 }
-
-/** Covers saved as device files (file://, content://) don't exist anywhere else, so they're left out. */
-const portableCover = (url: string | null) => (url && /^(https?|data):/.test(url) ? url : null);
 
 export function backupFileName(date = today()): string {
   return `bookie-backup-${date}.json`;

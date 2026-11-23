@@ -21,6 +21,12 @@ describe('nextTransition', () => {
     expect(nextTransition(['/', '/book/3'], '/')).toEqual({ transition: null, trail: ['/'] });
   });
 
+  it('leaves the trip between the Friends hallway and a friend’s shelf to the hallway’s turn', () => {
+    expect(nextTransition(['/', '/friends'], '/friends/abc')).toEqual({ transition: null, trail: ['/', '/friends', '/friends/abc'] });
+    expect(nextTransition(['/', '/friends', '/friends/abc'], '/friends')).toEqual({ transition: null, trail: ['/', '/friends'] });
+    expect(nextTransition(['/'], '/friends')).toMatchObject({ transition: 'forward' });
+  });
+
   it('does nothing when the path stays the same', () => {
     expect(nextTransition(['/', '/book/3'], '/book/3')).toEqual({ transition: null, trail: ['/', '/book/3'] });
   });

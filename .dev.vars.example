@@ -1,0 +1,9 @@
+# Copy to .dev.vars (which git ignores) for `npm run api:dev`. Only for running the API on this computer.
+
+# Signs access tokens. Any random string of 32+ characters, e.g. from:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+SESSION_SIGNING_KEY=
+
+# Optional: let the Expo dev server (npx expo start --web) call this API from another port.
+# Then set EXPO_PUBLIC_BOOKIE_API_URL=http://localhost:8788 in .env.local.
+# ALLOWED_ORIGINS=http://localhost:8081

@@ -6,7 +6,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } fr
 import { Colors, Fonts } from '@/constants/theme';
 import { registerSpine, useBookFlight, type Rect, type SpineRect } from '@/library/bookFlight';
 import { creases, ghostColors, GHOST_FILL, MARKER_REACH, spineCues } from '@/shelf/spineCues';
-import { DECORATION, type SpineStyle } from '@/shelf/spineStyle';
+import { labelBoxHeight } from '@/shelf/spineBoxes';
+import { DECORATION, LABEL_WASH, type SpineStyle } from '@/shelf/spineStyle';
 import { LINE_HEIGHT } from '@/shelf/spineText';
 import { byZoom } from '@/shelf/zoom';
 import type { Book } from '@/types';
@@ -27,7 +28,10 @@ const SHEEN_STOPS = [0.26, 0.36, 0.5] as const;
 const CREASE = ['rgba(255,250,238,0)', 'rgba(255,250,238,0.34)', 'rgba(255,250,238,0.34)', 'rgba(255,250,238,0)'] as const;
 const CREASE_WIDTH = 1;
 
-/** Spine ornaments. The text is set clear of them (see TEXT_INSETS in spineStyle), and the label box wraps the title. */
+/**
+ * Spine ornaments, where spineBoxes says they are: getSpineStyle only picks one that stays clear of the text (a frame
+ * on a thin spine becomes bands), and the label box wraps the title.
+ */
 function Decoration({ s }: { s: SpineStyle }) {
   const z = s.zoom;
   const styles = stylesFor(z);
@@ -48,7 +52,7 @@ function Decoration({ s }: { s: SpineStyle }) {
     case 'label': {
       const pad = DECORATION.labelPad * z;
       const top = s.text.start - pad;
-      const height = Math.min(s.text.titleLength + 2 * pad, s.height - top - s.text.end + pad);
+      const height = labelBoxHeight(s.height / z, { ...s.text, start: s.text.start / z, end: s.text.end / z, titleLength: s.text.titleLength / z }) * z;
       return <View style={[styles.label, { top, height, borderColor: s.accentColor }]} />;
     }
     case 'frame':
@@ -132,7 +136,7 @@ function Creases({ book, style: s }: { book: Book; style: SpineStyle }) {
   // Placed on the spine at its normal size, then drawn bigger, so a zoomed spine has the very same creases.
   return (
     <>
-      {creases(book.id, s.width / z, s.height / z).flatMap((crease, i) =>
+      {creases(book.id, s.width / z, s.height / z, s.textBoxes).flatMap((crease, i) =>
         crease.map((piece, j) => {
           const { strength, fadeStart, fadeEnd } = piece;
           const [x1, y1, x2, y2] = [piece.x1 * z, piece.y1 * z, piece.x2 * z, piece.y2 * z];
@@ -241,17 +245,17 @@ const stylesFor = byZoom((z) =>
     },
     label: {
       position: 'absolute',
-      left: 3 * z,
-      right: 3 * z,
-      borderWidth: z,
+      left: DECORATION.side * z,
+      right: DECORATION.side * z,
+      borderWidth: DECORATION.line * z,
       borderRadius: z,
-      backgroundColor: 'rgba(255,248,230,0.12)',
+      backgroundColor: `${LABEL_WASH.color}${Math.round(LABEL_WASH.opacity * 255).toString(16).padStart(2, '0')}`,
     },
     frame: {
       position: 'absolute',
-      left: 3 * z,
-      right: 3 * z,
-      borderWidth: StyleSheet.hairlineWidth * 2 * z,
+      left: DECORATION.side * z,
+      right: DECORATION.side * z,
+      borderWidth: Math.min(DECORATION.line, StyleSheet.hairlineWidth * 2) * z,
     },
     crease: {
       position: 'absolute',

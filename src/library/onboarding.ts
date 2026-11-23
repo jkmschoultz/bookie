@@ -8,7 +8,7 @@ const VERSION_KEY = 'onboarding.version';
  * changed steps this version as their `since`. Anyone on an older version is offered just those steps, once, as
  * "What's new" (see `tourSteps`). Version 1 is the original tour, which didn't record a version.
  */
-export const TOUR_VERSION = 4;
+export const TOUR_VERSION = 5;
 
 /** What `tourSteps` needs to know about a step of the tour. */
 export interface TourStepInfo {
@@ -27,10 +27,16 @@ export function tourSteps<T extends TourStepInfo>(steps: readonly T[], seenVersi
   return steps.filter((s) => (web || !s.webOnly) && (seenVersion == null || s.since > seenVersion));
 }
 
-/** What the "Psst" alert tells a returning user about the tour steps that are new to them, given their titles. */
-export function whatsNewMessage(titles: readonly string[]): string {
-  if (titles.length === 1) return `There's something new: ${titles[0].charAt(0).toLowerCase()}${titles[0].slice(1)}. Want a look?`;
-  return `The welcome tour has ${titles.length} new things in it. Want a look?`;
+/**
+ * What the "Psst" alert tells a returning user about the tour steps that are new to them. A single step can say what's
+ * new in its own words (`news`); otherwise it's named by its title.
+ */
+export function whatsNewMessage(steps: readonly { title: string; news?: string }[]): string {
+  if (steps.length === 1) {
+    const [{ title, news }] = steps;
+    return news ?? `There's something new: ${title.charAt(0).toLowerCase()}${title.slice(1)}. Want a look?`;
+  }
+  return `The welcome tour has ${steps.length} new things in it. Want a look?`;
 }
 
 /** The tour version last seen on this device, or null if the tour has never been seen. */

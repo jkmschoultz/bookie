@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { markWhatsToComeSeen } from '@/library/onboarding';
 
 /**
  * A click-through preview of ideas for later. Offered once on its own (see `shouldShowWhatsToCome`), and any time from
- * Settings. Nothing in it works yet.
+ * Settings.
  */
 export default function WhatsToComeScreen() {
   const insets = useSafeAreaInsets();
@@ -34,6 +34,12 @@ export default function WhatsToComeScreen() {
     setIndex(Math.min(PAGES.length - 1, Math.max(0, Math.round(at))));
     // Start drawing the next page as soon as it begins to slide in.
     reach(Math.ceil(at - 0.01));
+  };
+
+  // Opening one of the pages counts as having seen the preview.
+  const openPage = async (href: Href) => {
+    await markWhatsToComeSeen();
+    router.replace(href);
   };
 
   const close = async () => {
@@ -63,6 +69,11 @@ export default function WhatsToComeScreen() {
                   <Text style={styles.title}>{page.title}</Text>
                   <Text style={styles.body}>{page.body}</Text>
                   <PageStateContext.Provider value={{ reached: i <= reached, current: i === index }}>{page.visual}</PageStateContext.Provider>
+                  {page.action && (
+                    <Pressable style={styles.action} onPress={() => openPage(page.action!.href)} accessibilityRole="button">
+                      <Text style={styles.actionText}>{page.action.label}</Text>
+                    </Pressable>
+                  )}
                 </View>
               </ScrollView>
             ))}
@@ -112,6 +123,8 @@ const styles = StyleSheet.create({
   icon: { fontSize: 40, color: Colors.accent },
   title: { color: Colors.text, fontSize: 28, fontFamily: Fonts.serif, fontWeight: '700' },
   body: { color: Colors.textMuted, fontSize: 16, lineHeight: 23, marginBottom: 6 },
+  action: { alignSelf: 'center', marginTop: 6, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: Colors.accent },
+  actionText: { color: Colors.accent, fontSize: 15, fontWeight: '700' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 12, marginBottom: 18 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.border },
   dotActive: { backgroundColor: Colors.accent, width: 20 },

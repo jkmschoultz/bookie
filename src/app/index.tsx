@@ -6,8 +6,10 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAccount } from '@/account/AccountProvider';
 import { alert } from '@/components/alert';
 import { BringBooksNote } from '@/components/BringBooksNote';
+import { FriendsIcon } from '@/components/FriendsIcon';
 import { MovedBanner } from '@/components/MovedBanner';
 import { QuickActions } from '@/components/QuickActions';
 import { SortBar } from '@/components/SortBar';
@@ -31,11 +33,21 @@ import { filterBooks } from '@/shelf/filter';
 import { useUi } from '@/store/uiStore';
 import type { Book } from '@/types';
 
+/** "Friends, 1 request waiting, 2 friends with news". */
+function friendsLabel({ requests, updated }: { requests: number; updated: number }): string {
+  const parts = ['Friends'];
+  if (requests) parts.push(`${requests} ${requests === 1 ? 'request' : 'requests'} waiting`);
+  if (updated) parts.push(`${updated} ${updated === 1 ? 'friend' : 'friends'} with news`);
+  return parts.join(', ');
+}
+
 export default function BookshelfScreen() {
   const insets = useSafeAreaInsets();
   const { books, loaded, addBooks } = useLibrary();
   const { sortMode, layoutMode, statusFilter, ownedFilter } = useUi();
   const [actionBook, setActionBook] = useState<Book | null>(null);
+  const { friendBadge } = useAccount();
+  const badge = friendBadge.requests + friendBadge.updated;
 
   // Read once the checks below are done, so "What's to come" never opens over another screen or sheet.
   const focused = useIsFocused();
@@ -55,7 +67,7 @@ export default function BookshelfScreen() {
       else if (fresh.length) {
         // Asked once per tour version, whichever way they answer.
         await markOnboardingSeen();
-        alert('Psst, Bookie has been updated', whatsNewMessage(fresh.map((s) => s.title)), [
+        alert('Psst, Bookie has been updated', whatsNewMessage(fresh), [
           { text: 'Not now', style: 'cancel' },
           { text: 'Show me', onPress: () => router.push({ pathname: '/welcome', params: { since: String(seen) } }) },
         ]);
@@ -109,6 +121,19 @@ export default function BookshelfScreen() {
           )}
         </View>
         <View style={styles.headerButtons}>
+          <Pressable
+            onPress={() => router.push('/friends')}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel={friendsLabel(friendBadge)}>
+            <FriendsIcon />
+            {/* Red with a request waiting; gold when it's only friends' news. */}
+            {badge > 0 && (
+              <View style={[styles.badge, !friendBadge.requests && styles.newsBadge]}>
+                <Text style={[styles.badgeText, !friendBadge.requests && styles.newsBadgeText]}>{badge > 9 ? '9+' : badge}</Text>
+              </View>
+            )}
+          </Pressable>
           <Pressable onPress={() => router.push('/settings')} style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Settings">
             <Text style={styles.iconText}>⚙</Text>
           </Pressable>
@@ -175,6 +200,23 @@ const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   iconText: { color: Colors.textMuted, fontSize: 22 },
+  badge: {
+    position: 'absolute',
+    top: 3,
+    right: 1,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: Colors.ribbon,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.background,
+  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  newsBadge: { backgroundColor: Colors.accent },
+  newsBadgeText: { color: Colors.accentText },
   addButton: {
     width: 42,
     height: 42,

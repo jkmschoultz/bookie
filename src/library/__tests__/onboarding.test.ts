@@ -69,11 +69,15 @@ describe('tourSteps', () => {
 
 describe('whatsNewMessage', () => {
   it('names a single new step', () => {
-    expect(whatsNewMessage(['What the spines mean'])).toBe("There's something new: what the spines mean. Want a look?");
+    expect(whatsNewMessage([{ title: 'What the spines mean' }])).toBe("There's something new: what the spines mean. Want a look?");
+  });
+
+  it('uses the step’s own news when it has some', () => {
+    expect(whatsNewMessage([{ title: 'Friends’ library', news: 'Bookie has friends now. Want a look?' }])).toBe('Bookie has friends now. Want a look?');
   });
 
   it('counts several new steps', () => {
-    expect(whatsNewMessage(['Books you own', 'Keep it on your home screen', 'What the spines mean'])).toBe(
+    expect(whatsNewMessage([{ title: 'Books you own' }, { title: 'Keep it on your home screen' }, { title: 'What the spines mean' }])).toBe(
       'The welcome tour has 3 new things in it. Want a look?',
     );
   });
