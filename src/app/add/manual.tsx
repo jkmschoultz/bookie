@@ -30,7 +30,8 @@ import { useUi } from '@/store/uiStore';
 import { emptyDraft, STATUS_LABELS, today, type Book, type BookDraft, type ReadStatus } from '@/types';
 
 const STATUSES: ReadStatus[] = ['owned', 'reading', 'read', 'want'];
-const SPINE_COLORS = [null, '#7a1f1f', '#c4622d', '#d89a3b', '#2f4a3a', '#6b8f5e', '#1f3a5f', '#5b7fa6', '#6a4c93', '#1c1c1c', '#e8e0cf'];
+// Each as it's drawn: a mid-tone is made a little lighter so its title reads (readableColours), so these are already.
+const SPINE_COLORS = [null, '#7a1f1f', '#c96f3e', '#d89a3b', '#2f4a3a', '#6b8f5e', '#1f3a5f', '#6889ad', '#6a4c93', '#1c1c1c', '#e8e0cf'];
 
 /** Form fields are strings while editing. */
 interface Form {

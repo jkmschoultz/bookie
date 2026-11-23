@@ -41,6 +41,8 @@ interface SpineBox {
   /** Clear space to keep at each end, e.g. below a decorative band. Defaults to END_PAD. */
   start?: number;
   end?: number;
+  /** Clear space to keep along each long edge, e.g. inside a frame's sides. Defaults to EDGE_PAD. */
+  side?: number;
 }
 
 /** Greedy word wrap. Null when a single word is longer than a whole line. */
@@ -72,7 +74,7 @@ export function fitSpineText(title: string, author: string | undefined, box: Spi
   const start = box.start ?? END_PAD;
   const end = box.end ?? END_PAD;
   const length = box.height - start - end;
-  const across = box.width - 2 * EDGE_PAD;
+  const across = box.width - 2 * Math.max(EDGE_PAD, box.side ?? 0);
   const letterSpacing = box.uppercase ? 0.8 : 0.2;
   const largest = Math.max(TITLE_SIZE.min, Math.min(TITLE_SIZE.max, box.width * 0.42));
   const surname = box.width >= AUTHOR_MIN_WIDTH ? (author?.split(' ').at(-1) ?? null) : null;

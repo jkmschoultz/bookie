@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import type { ReactNode } from 'react';
 
 import {
@@ -17,24 +18,27 @@ export interface WhatsToComePage {
   body: string;
   /** Shown under the body. */
   visual?: ReactNode;
+  /** For an idea that's here now: a button to open it. */
+  action?: { label: string; href: Href };
 }
 
 const LATER = 'Coming later';
 
-/** The "What's to come" preview, in order: ideas for later, none of which work yet. */
+/** The "What's to come" preview, in order: the friends' library, which is here now, then ideas for later. */
 export const WHATS_TO_COME_PAGES: WhatsToComePage[] = [
   {
     tag: 'A preview',
     icon: '🔭',
     title: 'What’s to come',
-    body: 'Here are some ideas for where Bookie is heading. None of them work yet, and plans may change along the way.',
+    body: 'Here are some ideas for where Bookie is heading. The first is here now; the rest don’t work yet, and plans may change along the way.',
   },
   {
-    tag: LATER,
+    tag: 'New',
     icon: '👥',
     title: 'Friends’ library',
-    body: 'A shared library hallway where each bookcase belongs to a friend. The more friends you add, the longer it gets. Sharing would need optional cloud storage, and keeping your library on this device only stays an option.',
+    body: 'A library hallway where each bookcase belongs to a friend. The more friends you add, the longer it gets. It needs an account, which is optional: keeping your library on this device only is still the default.',
     visual: <FriendsLibraryHallway />,
+    action: { label: 'Open your friends’ library', href: '/friends' },
   },
   {
     tag: LATER,
