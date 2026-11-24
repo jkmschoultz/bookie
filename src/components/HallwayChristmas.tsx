@@ -129,15 +129,14 @@ export function FarEndPresents() {
 
 /**
  * A garland of swags with warm lights, along a wall `length` long. It slides along the wall as you walk, like the
- * bookcases, so it moves past in perspective instead of staying put on the screen. `side` is the wall's side: the near
- * end is on the left of the left wall's view and on the right of the right wall's. The lights' colours repeat every
- * LOOP, so sliding round by that much is seamless.
+ * bookcases, so it moves past in perspective instead of staying put on the screen. Both walls' views have their near
+ * end on the right (see SideWall). The lights' colours repeat every LOOP, so sliding round by that much is seamless.
  */
-export function Garland({ length, top, walk, side }: { length: number; top: number; walk: SharedValue<number>; side: -1 | 1 }) {
+export function Garland({ length, top, walk }: { length: number; top: number; walk: SharedValue<number> }) {
   const swags = Math.ceil(length / SWAG) + 2;
   const slide = useAnimatedStyle(() => {
     const along = ((walk.value % LOOP) + LOOP) % LOOP;
-    return { transform: [{ translateX: side === -1 ? -along : along - LOOP }] };
+    return { transform: [{ translateX: along - LOOP }] };
   });
   return (
     <Animated.View style={[styles.garland, { top, width: (swags + LOOP / SWAG) * SWAG }, OWN_LAYER, slide]} pointerEvents="none">
