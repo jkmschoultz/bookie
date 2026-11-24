@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { splitBook } from '../../shared/books';
 import { change, testApi } from './helpers';
 
 async function twoPeople() {
@@ -60,20 +64,42 @@ describe('a friend’s shelf', () => {
     await api.call('POST', '/api/friends/requests', { username: 'bob' }, { token: api.ann.token });
     await api.call('POST', '/api/friends/requests', { username: 'ann' }, { token: api.bob.token });
     const book = change({ title: 'Bob’s book', notes: 'my secret note' });
-    book.book!.rating = 2;
+    Object.assign(book.book!, { status: 'read', rating: 2, dateStarted: '2026-03-01', dateFinished: '2026-03-20' });
     await api.call('POST', '/api/sync', { since: 0, changes: [book, { ...change(), deletedAt: 5, updatedAt: 5, book: null }] }, { token: api.bob.token });
     return api;
   }
 
-  it('shows their books without notes, ratings or reading dates, and not deleted ones', async () => {
+  it('shows their books with ratings and reading dates, never notes, and not deleted ones', async () => {
     const { call, ann, bob } = await friends();
     const res = await call('GET', `/api/friends/${bob.id}/books`, undefined, { token: ann.token });
     expect(res.body.friend).toMatchObject({ username: 'Bob', shelfVisible: true });
     expect(res.body.books).toHaveLength(1);
-    expect(res.body.books[0]).toMatchObject({ title: 'Bob’s book', status: 'owned', owned: true });
+    expect(res.body.books[0]).toMatchObject({ title: 'Bob’s book', status: 'read', owned: true, rating: 2, dateStarted: '2026-03-01', dateFinished: '2026-03-20' });
     expect(res.body.books[0]).not.toHaveProperty('notes');
-    expect(res.body.books[0]).not.toHaveProperty('rating');
     expect(res.body.books[0]).not.toHaveProperty('dateAdded');
+  });
+
+  it('shows ratings and reading dates of books synced before friends could see them, once migrated', async () => {
+    const { call, ann, bob, db } = await friends();
+    // A book stored the way it was before: rating and dates kept with the notes, out of what friends are sent.
+    const { book } = change({ title: 'Older book', notes: 'still secret' });
+    Object.assign(book!, { status: 'read', rating: 4.5, dateStarted: '2025-01-02', dateFinished: '2025-02-03' });
+    const { shared, personal } = splitBook(book!);
+    const { rating, dateStarted, dateFinished, ...before } = shared;
+    db.raw
+      .prepare('INSERT INTO books (user_id, id, data, private_data, updated_at, deleted_at, seq) VALUES (?, ?, ?, ?, 1000, NULL, 10)')
+      .run(bob.id, 'old-book', JSON.stringify(before), JSON.stringify({ ...personal, rating, dateStarted, dateFinished }));
+    db.raw.exec(readFileSync(join(__dirname, '..', '..', 'migrations', '0003_friends_see_ratings.sql'), 'utf8'));
+
+    const shelf = (await call('GET', `/api/friends/${bob.id}/books`, undefined, { token: ann.token })).body.books;
+    const older = shelf.find((b: { title: string }) => b.title === 'Older book');
+    expect(older).toMatchObject({ rating: 4.5, dateStarted: '2025-01-02', dateFinished: '2025-02-03' });
+    expect(older).not.toHaveProperty('notes');
+    // Books already stored the new way are left alone.
+    expect(shelf.find((b: { title: string }) => b.title === 'Bob’s book')).toMatchObject({ rating: 2, dateFinished: '2026-03-20' });
+    // Bob's own devices still get the whole book back, notes and all.
+    const own = (await call('POST', '/api/sync', { since: 0, changes: [] }, { token: bob.token })).body.changes.find((c: { id: string }) => c.id === 'old-book');
+    expect(own.book).toEqual(book);
   });
 
   it('is empty when they hide it', async () => {

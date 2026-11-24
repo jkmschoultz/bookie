@@ -15,7 +15,7 @@ export interface SyncBook {
   book: NewBook | null;
 }
 
-/** What friends see on your shelf: the book and where it stands, not your notes, ratings or reading dates. */
+/** What friends see on your shelf: the book, where it stands, your rating and reading dates. Never your notes. */
 export const FRIEND_FIELDS = [
   'isbn13',
   'isbn10',
@@ -34,12 +34,15 @@ export const FRIEND_FIELDS = [
   'coverPalette',
   'status',
   'owned',
+  'rating',
+  'dateStarted',
+  'dateFinished',
 ] as const satisfies readonly (keyof NewBook)[];
 
 export type FriendBook = Pick<NewBook, (typeof FRIEND_FIELDS)[number]>;
 
 /** Kept with your account, but only for you. */
-export const PRIVATE_FIELDS = ['rating', 'dateAdded', 'dateStarted', 'dateFinished', 'notes', 'source'] as const satisfies readonly (keyof NewBook)[];
+export const PRIVATE_FIELDS = ['dateAdded', 'notes', 'source'] as const satisfies readonly (keyof NewBook)[];
 
 /** A cover that is only on this device: a photo saved as a file, or kept inline (data:) on the web. */
 export function isDeviceCover(url: string | null): boolean {

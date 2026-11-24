@@ -1,6 +1,6 @@
 import { makeBook } from '@/test/makeBook';
 
-import { duplicateKey, findDuplicates } from '../duplicates';
+import { duplicateKey, findCopy, findDuplicates } from '../duplicates';
 
 describe('duplicateKey', () => {
   it('ignores case, accents, punctuation and spacing in initials', () => {
@@ -14,6 +14,22 @@ describe('duplicateKey', () => {
   it('tells different books and different authors apart', () => {
     expect(duplicateKey({ title: 'The Hobbit', authors: ['Tolkien'] })).not.toBe(duplicateKey({ title: 'The Two Towers', authors: ['Tolkien'] }));
     expect(duplicateKey({ title: 'Emma', authors: ['Jane Austen'] })).not.toBe(duplicateKey({ title: 'Emma', authors: ['Emma Tennant'] }));
+  });
+});
+
+describe('findCopy', () => {
+  const library = [makeBook({ title: 'The Hobbit', authors: ['J.R.R. Tolkien'] }), makeBook({ title: 'Dune', authors: ['Frank Herbert'], isbn13: '9780441172719' })];
+
+  it('finds the same book by title and first author, however it is written', () => {
+    expect(findCopy(library, { title: 'the hobbit', authors: ['J. R. R. Tolkien'], isbn13: null })).toBe(library[0]);
+  });
+
+  it('finds the same book by ISBN, even under another title', () => {
+    expect(findCopy(library, { title: 'Dune (40th anniversary)', authors: ['Herbert'], isbn13: '9780441172719' })).toBe(library[1]);
+  });
+
+  it('finds nothing for a book that is not there', () => {
+    expect(findCopy(library, { title: 'Emma', authors: ['Jane Austen'], isbn13: null })).toBeUndefined();
   });
 });
 

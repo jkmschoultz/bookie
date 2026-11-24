@@ -46,13 +46,14 @@ describe('covers', () => {
 });
 
 describe('splitBook', () => {
-  it('keeps notes, ratings and reading dates out of what friends see', () => {
+  it('shares ratings and reading dates with friends, and keeps notes out of what they see', () => {
     const { shared, personal } = splitBook(book);
+    expect(shared).toMatchObject({ rating: 4, dateFinished: '2026-01-02' });
     expect(shared).not.toHaveProperty('notes');
-    expect(shared).not.toHaveProperty('rating');
-    expect(shared).not.toHaveProperty('dateFinished');
+    expect(shared).not.toHaveProperty('dateAdded');
     expect(Object.keys(shared).sort()).toEqual([...FRIEND_FIELDS].sort());
-    expect(personal).toMatchObject({ notes: 'secret', rating: 4, dateFinished: '2026-01-02' });
+    expect(personal).toMatchObject({ notes: 'secret' });
+    expect(personal).not.toHaveProperty('rating');
     expect({ ...shared, ...personal }).toEqual(book);
   });
 });

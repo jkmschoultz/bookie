@@ -1,10 +1,12 @@
 /** Screens that open as sheets over the app on phones; on web they rise from the bottom too. */
-const SHEETS = [/^\/settings$/, /^\/add$/, /^\/welcome$/, /^\/whats-to-come$/, /^\/book\//];
+const SHEETS = [/^\/settings$/, /^\/add$/, /^\/welcome$/, /^\/whats-to-come$/, /^\/book\//, /^\/friends\/[^/]+\/book\//];
 
 export type Transition = 'forward' | 'back' | 'sheet-open' | 'sheet-close' | null;
 
-/** Between the shelf and a book's page the book itself flies (see BookFlight), so the screens stay still. */
-const BOOK_TRIP = (a: string, b: string) => (a === '/' && /^\/book\//.test(b)) || (b === '/' && /^\/book\//.test(a));
+/** Whether `book` is the page of a book on the shelf at `shelf`: yours, or a friend's. */
+const ON_SHELF = (shelf: string, book: string) => (shelf === '/' && /^\/book\//.test(book)) || (/^\/friends\/[^/]+$/.test(shelf) && book.startsWith(`${shelf}/book/`));
+/** Between a shelf and a book's page the book itself flies (see BookFlight), so the screens stay still. */
+const BOOK_TRIP = (a: string, b: string) => ON_SHELF(a, b) || ON_SHELF(b, a);
 /** Between the Friends hallway and a friend's shelf the hallway turns to their bookcase and the shelf fades in over it. */
 const FRIEND_TRIP = (a: string, b: string) => (a === '/friends' && /^\/friends\/./.test(b)) || (b === '/friends' && /^\/friends\/./.test(a));
 const STILL = (a: string, b: string) => BOOK_TRIP(a, b) || FRIEND_TRIP(a, b);

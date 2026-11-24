@@ -53,6 +53,7 @@ export default function RootLayout() {
                       <Stack.Screen name="friends/index" options={{ title: 'Friends', headerShown: false, presentation: 'fullScreenModal' }} />
                       {/* On the web the Friends hallway stays drawn under a friend's shelf, which fades in over it (see friends/[id]). */}
                       <Stack.Screen name="friends/[id]" options={{ title: '', animation: 'fade', presentation: Platform.OS === 'web' ? 'transparentModal' : undefined }} />
+                      <Stack.Screen name="friends/[id]/book/[book]" options={{ title: '', presentation: 'modal' }} />
                       <Stack.Screen name="move-in" options={{ headerShown: false }} />
                       <Stack.Screen name="welcome" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
                       <Stack.Screen name="whats-to-come" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
