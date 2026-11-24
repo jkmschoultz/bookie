@@ -14,6 +14,7 @@ export function makeBook(overrides: Partial<Book> = {}): Book {
     dateAdded: '2024-01-01',
     dateStarted: null,
     dateFinished: null,
+    statusChangedAt: null,
     notes: null,
     ...overrides,
   };

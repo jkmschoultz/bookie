@@ -17,6 +17,19 @@ describe('POST /api/sync', () => {
     expect((await call('POST', '/api/sync', { since: other.body.cursor }, { token })).body.changes).toEqual([]);
   });
 
+  it('keeps when a status last changed, and refuses a time that isn’t one', async () => {
+    const { call, signUp } = testApi();
+    const { token } = await signUp('ann');
+    const dune = change({ title: 'Dune' });
+    const book = { ...dune, book: { ...dune.book!, statusChangedAt: '2024-08-15T10:00:00.000Z' } };
+    await call('POST', '/api/sync', { since: 0, changes: [book] }, { token });
+    const other = await call('POST', '/api/sync', { since: 0 }, { token });
+    expect(other.body.changes[0].book.statusChangedAt).toBe('2024-08-15T10:00:00.000Z');
+    const emma = change({ title: 'Emma' });
+    const bad = { ...emma, book: { ...emma.book!, statusChangedAt: 'last tuesday' } };
+    expect((await call('POST', '/api/sync', { since: 0, changes: [bad] }, { token })).status).toBe(400);
+  });
+
   it('keeps the newest version of a book (last writer wins), and sends it back to a device that sent an older one', async () => {
     const { call, signUp } = testApi();
     const { token } = await signUp('ann');

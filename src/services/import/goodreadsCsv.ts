@@ -74,6 +74,7 @@ export function rowToBook(row: GoodreadsRow): NewBook | null {
     dateAdded: date(row['Date Added']) ?? today(),
     dateStarted: null,
     dateFinished: status === 'read' ? dateRead : null,
+    statusChangedAt: null,
     notes: row['Private Notes']?.trim() || null,
   };
 }

@@ -42,6 +42,8 @@ export interface Book extends BookDraft {
   dateAdded: string; // ISO date (YYYY-MM-DD)
   dateStarted: string | null;
   dateFinished: string | null;
+  /** When the status last changed, as an ISO time. Only you see it; null until it has changed on this device. */
+  statusChangedAt: string | null;
   notes: string | null;
 }
 

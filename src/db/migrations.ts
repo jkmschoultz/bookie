@@ -47,6 +47,10 @@ export const MIGRATIONS: string[] = [
   CREATE UNIQUE INDEX idx_books_uid ON books(uid);
   CREATE INDEX idx_books_dirty ON books(dirty);
   `,
+  // When the status last changed (an ISO time), for sorting by recent activity. Books from before have none.
+  `
+  ALTER TABLE books ADD COLUMN status_changed_at TEXT;
+  `,
 ];
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {

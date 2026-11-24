@@ -143,9 +143,13 @@ function monthGroup(key: string, month: string, books: Book[]): ShelfGroup {
   return { key, label: `${MONTHS[m - 1]} ${y}`, span: `${MONTHS[m - 1].slice(0, 3)} ${y}`, books };
 }
 
-/** The latest of a book's dates, as a sortable ISO day: when it was added or last moved to reading or read. */
+/**
+ * The latest of a book's dates, as a sortable ISO day: when it was added, started or finished, or its status last
+ * changed. Friends' copies have no added or status-change dates, so only their reading dates count.
+ */
 function latestActivity(book: Book): string {
-  return [book.dateAdded, book.dateStarted, book.dateFinished].filter(Boolean).sort().at(-1) ?? '';
+  const dates = [book.dateAdded, book.dateStarted, book.dateFinished, book.statusChangedAt?.slice(0, 10)];
+  return dates.filter(Boolean).sort().at(-1) ?? '';
 }
 
 function byRecent(books: Book[]): ShelfGroup[] {

@@ -42,7 +42,7 @@ export const FRIEND_FIELDS = [
 export type FriendBook = Pick<NewBook, (typeof FRIEND_FIELDS)[number]>;
 
 /** Kept with your account, but only for you. */
-export const PRIVATE_FIELDS = ['dateAdded', 'notes', 'source'] as const satisfies readonly (keyof NewBook)[];
+export const PRIVATE_FIELDS = ['dateAdded', 'statusChangedAt', 'notes', 'source'] as const satisfies readonly (keyof NewBook)[];
 
 /** A cover that is only on this device: a photo saved as a file, or kept inline (data:) on the web. */
 export function isDeviceCover(url: string | null): boolean {
