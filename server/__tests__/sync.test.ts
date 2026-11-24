@@ -30,6 +30,16 @@ describe('POST /api/sync', () => {
     expect((await call('POST', '/api/sync', { since: 0, changes: [bad] }, { token })).status).toBe(400);
   });
 
+  it('stores a time in ISO form whatever form the device sent', async () => {
+    const { call, signUp } = testApi();
+    const { token } = await signUp('ann');
+    const dune = change({ title: 'Dune' });
+    const sent = { ...dune, book: { ...dune.book!, statusChangedAt: 'Thu, 15 Aug 2024 10:00:00 GMT' } };
+    await call('POST', '/api/sync', { since: 0, changes: [sent] }, { token });
+    const { body } = await call('POST', '/api/sync', { since: 0 }, { token });
+    expect(body.changes[0].book.statusChangedAt).toBe('2024-08-15T10:00:00.000Z');
+  });
+
   it('keeps the newest version of a book (last writer wins), and sends it back to a device that sent an older one', async () => {
     const { call, signUp } = testApi();
     const { token } = await signUp('ann');

@@ -64,7 +64,7 @@ describe('a friend’s shelf', () => {
     await api.call('POST', '/api/friends/requests', { username: 'bob' }, { token: api.ann.token });
     await api.call('POST', '/api/friends/requests', { username: 'ann' }, { token: api.bob.token });
     const book = change({ title: 'Bob’s book', notes: 'my secret note' });
-    Object.assign(book.book!, { status: 'read', rating: 2, dateStarted: '2026-03-01', dateFinished: '2026-03-20' });
+    Object.assign(book.book!, { status: 'read', rating: 2, dateStarted: '2026-03-01', dateFinished: '2026-03-20', statusChangedAt: '2026-03-20T09:00:00.000Z' });
     await api.call('POST', '/api/sync', { since: 0, changes: [book, { ...change(), deletedAt: 5, updatedAt: 5, book: null }] }, { token: api.bob.token });
     return api;
   }
@@ -77,6 +77,7 @@ describe('a friend’s shelf', () => {
     expect(res.body.books[0]).toMatchObject({ title: 'Bob’s book', status: 'read', owned: true, rating: 2, dateStarted: '2026-03-01', dateFinished: '2026-03-20' });
     expect(res.body.books[0]).not.toHaveProperty('notes');
     expect(res.body.books[0]).not.toHaveProperty('dateAdded');
+    expect(res.body.books[0]).not.toHaveProperty('statusChangedAt');
   });
 
   it('shows ratings and reading dates of books synced before friends could see them, once migrated', async () => {

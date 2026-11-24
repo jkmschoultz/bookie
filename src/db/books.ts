@@ -135,7 +135,8 @@ export async function insertBooks(db: SQLiteDatabase, books: NewBook[]): Promise
 /** Marks a book changed: stamped now, or just after its last change if this device's clock is behind. */
 const CHANGED = 'updated_at = max(?, updated_at + 1), dirty = 1';
 
-export async function updateBook(db: SQLiteDatabase, id: number, patch: Partial<NewBook>): Promise<void> {
+/** Saves a change to a book. Returns what was saved, including any stamp it got, so the shelf in memory can match. */
+export async function updateBook(db: SQLiteDatabase, id: number, patch: Partial<NewBook>): Promise<Partial<NewBook>> {
   let changes = patch;
   // A new status is stamped as changed now, unless the caller says when.
   if ('status' in patch && !('statusChangedAt' in patch)) {
@@ -143,9 +144,10 @@ export async function updateBook(db: SQLiteDatabase, id: number, patch: Partial<
     if (row && row.status !== patch.status) changes = { ...patch, statusChangedAt: new Date().toISOString() };
   }
   const keys = (Object.keys(changes) as (keyof NewBook)[]).filter((k) => k in COLUMNS);
-  if (!keys.length) return;
+  if (!keys.length) return {};
   const sql = `UPDATE books SET ${keys.map((k) => `${COLUMNS[k]} = ?`).join(', ')}, ${CHANGED} WHERE id = ?`;
   await db.runAsync(sql, [...keys.map((k) => toValue(k, changes[k])), Date.now(), id]);
+  return changes;
 }
 
 export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> {

@@ -4,9 +4,9 @@ import { FlatList, Platform, StyleSheet, View, useWindowDimensions, type ListRen
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Wood } from '@/constants/theme';
-import { combineRanges, groupBooks, type ShelfGroup, type SortMode } from '@/shelf/grouping';
-import { layoutShelves, type LayoutMode, type ShelfRow as Row } from '@/shelf/layout';
-import { spineWidth } from '@/shelf/spineStyle';
+import { arrangeShelves } from '@/shelf/arrange';
+import type { SortMode } from '@/shelf/grouping';
+import type { LayoutMode, ShelfRow as Row } from '@/shelf/layout';
 import { shelfMetrics, shelfZoom } from '@/shelf/zoom';
 import type { SpineRect } from '@/library/bookFlight';
 import type { Book } from '@/types';
@@ -33,12 +33,11 @@ export function Bookcase({ books, sortMode, layoutMode, onOpen, onLongPress, bot
   const m = shelfMetrics(zoom);
   const shelfWidth = width - 2 * (m.gutter + m.sidePanel);
 
-  const rows = useMemo(() => {
-    // Letters and decades are combined into ranges of about a screen of books each ("A–D", "1960s–1980s").
-    const widthOf = (g: ShelfGroup) => g.books.reduce((w, b) => w + spineWidth(b.pageCount) * zoom + m.gap, 0);
-    const groups = combineRanges(groupBooks(books, sortMode), shelfWidth, widthOf);
-    return layoutShelves(groups, { mode: layoutMode, shelfWidth, gap: m.gap, zoom });
-  }, [books, sortMode, layoutMode, shelfWidth, zoom, m.gap]);
+  // Letters and decades are combined into ranges of about a screen of books each ("A–D", "1960s–1980s").
+  const rows = useMemo(
+    () => arrangeShelves(books, { sortMode, layoutMode, shelfWidth, zoom, gap: m.gap }),
+    [books, sortMode, layoutMode, shelfWidth, zoom, m.gap],
+  );
 
   const renderRow = useCallback<ListRenderItem<Row>>(
     ({ item }) => <ShelfRow row={item} scrollable={item.width > shelfWidth} zoom={zoom} onOpen={onOpen} onLongPress={onLongPress} />,

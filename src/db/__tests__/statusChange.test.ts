@@ -35,6 +35,14 @@ describe('when a status changed', () => {
     expect((await repo.getAllBooks(db))[0].statusChangedAt).toBe(started);
   });
 
+  it('returns the changes it saved, stamp included, so the shelf in memory can match', async () => {
+    const db = await library();
+    const book = await repo.insertBook(db, newBook({ status: 'owned' }));
+    const saved = await repo.updateBook(db, book.id, { status: 'read' });
+    expect(saved).toEqual({ status: 'read', statusChangedAt: expect.any(String) });
+    expect(saved.statusChangedAt).toBe((await repo.getAllBooks(db))[0].statusChangedAt);
+  });
+
   it('keeps a time the caller gives, such as one arriving from sync', async () => {
     const db = await library();
     const book = await repo.insertBook(db, newBook({ status: 'owned' }));
