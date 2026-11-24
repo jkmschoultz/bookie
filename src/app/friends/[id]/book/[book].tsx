@@ -106,7 +106,7 @@ function FriendBookDetails({ book, who }: { book: Book; who: string }) {
               <Text style={styles.yoursTitle}>{added ? 'Added to your shelf' : 'On your shelf already'}</Text>
               <Text style={styles.yoursLine}>
                 {STATUS_LABELS[mine.status]}
-                {mine.owned ? '' : ' · not owned'}
+                {mine.owned || mine.status === 'want' ? '' : ' · not owned'}
               </Text>
             </View>
             <Action title="Open my copy" primary onPress={() => router.push({ pathname: '/book/[id]', params: { id: String(mine.id) } })} />
