@@ -50,6 +50,26 @@ describe('when a status changed', () => {
     expect((await repo.getAllBooks(db))[0].statusChangedAt).toBe('2024-02-03T04:05:06.000Z');
   });
 
+  it('is set by an edit that changes the status, when the edit leaves the old stamp out', async () => {
+    const db = await library();
+    const book = await repo.insertBook(db, newBook({ status: 'reading', statusChangedAt: '2020-01-01T00:00:00.000Z' }));
+    const { statusChangedAt: _old, ...rest } = (await repo.getAllBooks(db))[0];
+    await repo.updateBook(db, book.id, { ...rest, status: 'read' });
+    const stamp = (await repo.getAllBooks(db))[0].statusChangedAt;
+    expect(stamp).not.toBe('2020-01-01T00:00:00.000Z');
+    expect(Math.abs(Date.parse(stamp!) - Date.now())).toBeLessThan(60_000);
+  });
+
+  it('keeps the stored stamp on an edit that leaves the status alone, even one that sends the whole book', async () => {
+    const db = await library();
+    const book = await repo.insertBook(db, newBook({ status: 'reading', statusChangedAt: '2020-01-01T00:00:00.000Z' }));
+    const stored = (await repo.getAllBooks(db))[0];
+    await repo.updateBook(db, book.id, { ...stored, title: 'Dune Messiah' });
+    const after = (await repo.getAllBooks(db))[0];
+    expect(after.title).toBe('Dune Messiah');
+    expect(after.statusChangedAt).toBe('2020-01-01T00:00:00.000Z');
+  });
+
   it('travels with the account, and is kept private from friends', async () => {
     const db = await library();
     const book = await repo.insertBook(db, newBook({ status: 'owned' }));
