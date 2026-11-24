@@ -524,9 +524,9 @@ function AisleSign({ friend: f, side, fog }: { friend: HallwayFriend; side: -1 |
 /**
  * Something facing down the hallway, centred on (x, y) at depth z as walked, seen through the camera. Hidden once it
  * is past the eye at `hideAfter`; with `fadeFrom`, it fades out smoothly on the way there instead of vanishing. With
- * `besides`, a turned camera still sees it close by on either side (a bookcase's end, the far wall); otherwise it stays
- * hidden that close (signs and lamps, which would loom). `dims` fades it as the camera turns to a bookcase, and
- * `oneSided` hides it from behind (a bookcase's end, seen from inside the bookcase).
+ * `besides`, a turned camera still sees it close by on either side (a bookcase's end, the far wall), fading out just
+ * before the eye; otherwise it stays hidden that close (signs and lamps, which would loom). `dims` fades it as the
+ * camera turns to a bookcase, and `oneSided` hides it from behind (a bookcase's end, seen from inside the bookcase).
  */
 function Facing({
   walk,
@@ -562,10 +562,9 @@ function Facing({
     const c = cam.value;
     const at = z + walk.value;
     const seen = seenAt(c, x, at);
-    let opacity: number;
-    if (fadeFrom != null) opacity = clamp((hideAfter - seen) / (hideAfter - fadeFrom), 0, 1);
-    else if (besides && c.relax > 0) opacity = clamp((hideAt(c, hideAfter) - seen) / 30, 0, 1);
-    else opacity = seen > hideAfter ? 0 : 1;
+    const hide = besides ? hideAt(c, hideAfter) : hideAfter;
+    const fade = fadeFrom != null ? hideAfter - fadeFrom : besides && c.relax > 0 ? 30 : 0;
+    let opacity = fade ? clamp((hide - seen) / fade, 0, 1) : seen > hide ? 0 : 1;
     if (dims) opacity *= 1 - c.dim;
     // Out of sight, it stays put, shrunk away, so it costs nothing to draw and nothing close to the eye is drawn huge.
     return { opacity, transform: (opacity > 0 ? facing(c, x, y, at) : HIDDEN) as never };
@@ -647,7 +646,18 @@ const SideCase = memo(function SideCase({
         )}
         <Animated.View style={[styles.fog, FADING, fog]} />
       </Animated.View>
-      <Facing walk={walk} cam={cam} x={side * (HALF_WIDTH - CASE_DEPTH / 2)} y={CASE_MID_Y} z={near} hideAfter={CASE_HIDE} besides oneSided width={CASE_DEPTH} height={CASE_HEIGHT}>
+      <Facing
+        walk={walk}
+        cam={cam}
+        x={side * (HALF_WIDTH - CASE_DEPTH / 2)}
+        y={CASE_MID_Y}
+        z={near}
+        hideAfter={END_HIDE}
+        fadeFrom={END_FADE}
+        besides
+        oneSided
+        width={CASE_DEPTH}
+        height={CASE_HEIGHT}>
         <LinearGradient colors={left ? end : [end[1], end[0]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.endPanel, f.request && styles.potential]}>
           <View style={[styles.endTrim, f.request && styles.potentialTrim]} />
         </LinearGradient>
@@ -762,24 +772,48 @@ const BEAM = 120;
 
 /**
  * The floor, ceiling and side walls run from the far end to NEAR_Z past the picture, behind the eye, so a turned camera
- * finds them beside it too. Shares of their length, for gradients laid out along it from either end.
+ * finds them beside it too. All four are turned into place the same way, with the far end at the start of their view
+ * (its top, or its left) and the near end, behind the eye, at its end: Firefox draws nothing of a plane whose part
+ * behind the eye is at the start of its view. So the ceiling is the floor raised up and seen from below, and the left
+ * wall is the right wall moved across and seen from behind; what's on them is the same either way round.
+ * Shares of their length, for gradients laid out along it from either end.
  */
 const span = (length: number) => length + NEAR_Z;
 const fromFar = (length: number, share: number) => (share * length) / span(length);
 const fromNear = (length: number, share: number) => (NEAR_Z + share * length) / span(length);
 
+/** Wooden boards running along the hallway, so their seams meet at the vanishing point; three shades, in turn. */
+function Boards({ colors }: { colors: readonly [string, string, string] }) {
+  return (
+    <View style={styles.boards}>
+      {Array.from({ length: BOARDS }, (_, i) => (
+        <View key={i} style={[styles.board, { width: (2 * HALF_WIDTH) / BOARDS, backgroundColor: colors[i % 3] }]} />
+      ))}
+    </View>
+  );
+}
+
+/** The floor and ceiling darken towards the far end, which is at the top of their views. */
+function FarEndDark({ length }: { length: number }) {
+  return (
+    <LinearGradient
+      colors={['rgba(8,5,2,0.85)', 'rgba(8,5,2,0.4)', 'rgba(8,5,2,0)']}
+      locations={[0, fromFar(length, 0.55), fromFar(length, 0.9)]}
+      style={StyleSheet.absoluteFill}
+    />
+  );
+}
+
+const FLOOR_BOARDS = [Wood.plankTop[0], '#ad7b49', '#94663b'] as const;
+/** The ceiling is the same wood, a shade darker, in the shadow above the lamps. */
+const CEILING_BOARDS = ['#644530', '#6d4b33', '#5c3f2b'] as const;
+
 const Floor = memo(function Floor({ walk, cam, length }: { walk: SharedValue<number>; cam: SharedValue<Camera>; length: number }) {
   const { FLOOR } = useGeometry();
-  const board = (2 * HALF_WIDTH) / BOARDS;
   const all = span(length);
   return (
     <Plane cam={cam} width={2 * HALF_WIDTH} height={all} transform={[{ translateY: FLOOR }, { rotateX: '90deg' }, { translateY: (NEAR_Z - length) / 2 }]}>
-      {/* Boards run along the hallway, so their seams meet at the vanishing point. */}
-      <View style={styles.boards}>
-        {Array.from({ length: BOARDS }, (_, i) => (
-          <View key={i} style={[styles.board, { width: board, backgroundColor: i % 3 === 0 ? '#7d522f' : i % 3 === 1 ? '#8a5c35' : '#734a2a' }]} />
-        ))}
-      </View>
+      <Boards colors={FLOOR_BOARDS} />
       <LinearGradient
         colors={['#481f22', '#742d2b', '#542124']}
         start={{ x: 0, y: 0 }}
@@ -800,12 +834,7 @@ const Floor = memo(function Floor({ walk, cam, length }: { walk: SharedValue<num
       </Crosswise>
       <LinearGradient colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.caseShadow, { left: CASE_DEPTH }]} />
       <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.5)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.caseShadow, { right: CASE_DEPTH }]} />
-      {/* The far end is at the top. */}
-      <LinearGradient
-        colors={['rgba(8,5,2,0.95)', 'rgba(8,5,2,0.55)', 'rgba(8,5,2,0)']}
-        locations={[0, fromFar(length, 0.55), fromFar(length, 0.9)]}
-        style={StyleSheet.absoluteFill}
-      />
+      <FarEndDark length={length} />
     </Plane>
   );
 });
@@ -814,21 +843,14 @@ const Ceiling = memo(function Ceiling({ walk, cam, length }: { walk: SharedValue
   const { CEILING } = useGeometry();
   const all = span(length);
   return (
-    <Plane cam={cam} width={2 * HALF_WIDTH} height={all} transform={[{ translateY: CEILING }, { rotateX: '-90deg' }, { translateY: (length - NEAR_Z) / 2 }]}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#2a1c13' }]} />
-      {/* The ceiling's near edge is at the bottom of this view, so the beams slide downwards too, but flipped. */}
-      <View style={[StyleSheet.absoluteFill, { transform: [{ scaleY: -1 }] }]}>
-        <Crosswise walk={walk} every={BEAM}>
-          {Array.from({ length: Math.ceil(all / BEAM) + 1 }, (_, i) => (
-            <View key={i} style={[styles.beam, { top: i * BEAM }]} />
-          ))}
-        </Crosswise>
-      </View>
-      <LinearGradient
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
-        locations={[fromNear(length, 0.1), fromNear(length, 0.45), 1]}
-        style={StyleSheet.absoluteFill}
-      />
+    <Plane cam={cam} width={2 * HALF_WIDTH} height={all} transform={[{ translateY: CEILING }, { rotateX: '90deg' }, { translateY: (NEAR_Z - length) / 2 }]}>
+      <Boards colors={CEILING_BOARDS} />
+      <Crosswise walk={walk} every={BEAM}>
+        {Array.from({ length: Math.ceil(all / BEAM) + 1 }, (_, i) => (
+          <View key={i} style={[styles.beam, { top: i * BEAM }]} />
+        ))}
+      </Crosswise>
+      <FarEndDark length={length} />
     </Plane>
   );
 });
@@ -836,19 +858,14 @@ const Ceiling = memo(function Ceiling({ walk, cam, length }: { walk: SharedValue
 const SideWall = memo(function SideWall({ walk, cam, side, length }: { walk: SharedValue<number>; cam: SharedValue<Camera>; side: -1 | 1; length: number }) {
   const { FLOOR, CEILING, CASE_TOP } = useGeometry();
   const { season } = use(SeasonContext);
-  const left = side === -1;
   const all = span(length);
   return (
     <Plane
       cam={cam}
       width={all}
       height={FLOOR - CEILING}
-      transform={[
-        { translateX: side * HALF_WIDTH },
-        { translateY: (FLOOR + CEILING) / 2 },
-        { rotateY: left ? '90deg' : '-90deg' },
-        { translateX: left ? (length - NEAR_Z) / 2 : (NEAR_Z - length) / 2 },
-      ]}>
+      // The near end is on the right of the view, on both walls.
+      transform={[{ translateX: side * HALF_WIDTH }, { translateY: (FLOOR + CEILING) / 2 }, { rotateY: '-90deg' }, { translateX: (NEAR_Z - length) / 2 }]}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: '#34473b' }]} />
       <LinearGradient
         colors={['rgba(218,190,135,0.1)', 'rgba(18,27,21,0.04)', 'rgba(8,14,11,0.2)']}
@@ -857,12 +874,12 @@ const SideWall = memo(function SideWall({ walk, cam, side, length }: { walk: Sha
       />
       <View style={styles.wallRail} />
       {/* Above the bookcases, where the wall is bare, moving along with them. */}
-      {season === 'christmas' && <Garland length={all} top={(CASE_TOP - CEILING) * 0.32} walk={walk} side={side} />}
+      {season === 'christmas' && <Garland length={all} top={(CASE_TOP - CEILING) * 0.32} walk={walk} />}
       <LinearGradient
         colors={['rgba(8,5,2,0)', 'rgba(8,5,2,0.6)', 'rgba(8,5,2,0.95)']}
         locations={[fromNear(length, 0.05), fromNear(length, 0.4), fromNear(length, 0.9)]}
-        start={{ x: left ? 0 : 1, y: 0 }}
-        end={{ x: left ? 1 : 0, y: 0 }}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 0 }}
         style={StyleSheet.absoluteFill}
       />
     </Plane>
@@ -877,7 +894,7 @@ const FarWall = memo(function FarWall({ walk, cam, length }: { walk: SharedValue
   const christmas = season === 'christmas';
   return (
     <Facing walk={walk} cam={cam} x={0} y={(FLOOR + CEILING) / 2} z={-length} hideAfter={0} besides width={2 * HALF_WIDTH} height={height}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#22170f' }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: FAR_WALL }]} />
       <View style={styles.window}>
         {christmas ? (
           <ChristmasWindow height={height * WINDOW_SHARE - 12} playing={playing} />
@@ -903,6 +920,9 @@ const FarWall = memo(function FarWall({ walk, cam, length }: { walk: SharedValue
     </Facing>
   );
 });
+
+/** Warm, lit plaster, dimmed by the distance. */
+const FAR_WALL = '#4f3422';
 
 /** How much of the far wall's height the window takes (styles.window: 21% from the top, 36% from the bottom). */
 const WINDOW_SHARE = 0.43;
@@ -1407,6 +1427,12 @@ const SIGN_FADE = 50;
 const SIGN_HIDE = 100;
 /** A bookcase whose near end has come this far past the picture is gone (hallwayHit uses the same). */
 const CASE_HIDE = 100;
+/**
+ * Its end panel stays a little longer, so the bookcase just behind you, beside the one in front, still has its near
+ * end in a wide window. It fades out between these depths as it goes off the side of the picture, before it looms.
+ */
+const END_FADE = 150;
+const END_HIDE = 200;
 const LAMP_FADE = -140;
 const LAMP_HIDE = -30;
 /** How far down the hallway signs have faded out. */
@@ -1481,7 +1507,7 @@ const styles = StyleSheet.create({
   crosswise: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   joint: { position: 'absolute', left: 0, right: 0, height: 1.5, backgroundColor: 'rgba(30,16,6,0.5)' },
   caseShadow: { position: 'absolute', width: 28, top: 0, bottom: 0 },
-  beam: { position: 'absolute', left: 0, right: 0, height: 14, backgroundColor: '#3b281a', borderBottomWidth: 2, borderBottomColor: '#1c120b' },
+  beam: { position: 'absolute', left: 0, right: 0, height: 14, backgroundColor: '#4a311e', borderBottomWidth: 2, borderBottomColor: '#24170c' },
   wallRail: { position: 'absolute', left: 0, right: 0, top: 70, height: 7, backgroundColor: '#67513a', borderTopWidth: 1, borderTopColor: 'rgba(220,184,119,0.55)', borderBottomWidth: 2, borderBottomColor: 'rgba(16,23,17,0.55)' },
   window: { position: 'absolute', left: 120, right: 120, top: '21%', bottom: '36%', borderTopLeftRadius: 50, borderTopRightRadius: 50, overflow: 'hidden', borderWidth: 6, borderColor: '#3a2817' },
   moon: { position: 'absolute', top: 30, right: 22, width: 18, height: 18, borderRadius: 9, backgroundColor: '#f1e8c8' },

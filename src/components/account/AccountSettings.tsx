@@ -112,7 +112,7 @@ export function AccountSettings() {
         )}
         <SwitchRow
           title="Show my shelf to friends"
-          body="Friends see your books and whether you’ve read them, never your notes, ratings or dates."
+          body="Friends see your books, whether you’ve read them, your ratings and reading dates. Your notes stay private."
           value={account.shelfVisible}
           onChange={(on) => act('shelf', () => a.setShelfVisible(on), 'Couldn’t change that')}
         />

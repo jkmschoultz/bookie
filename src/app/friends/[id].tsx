@@ -1,32 +1,35 @@
+import * as Haptics from 'expo-haptics';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, ReduceMotion } from 'react-native-reanimated';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeOut, ReduceMotion, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAccount } from '@/account/AccountProvider';
 import {
   cachedFriendShelf,
+  friendBookId,
   friendName,
   getFriendNews,
   getFriendShelf,
   markFriendNewsSeen,
   newsLine,
   removeFriend,
-  type Friend,
   type FriendNews,
+  type FriendShelf,
 } from '@/account/friends';
 import { markViewed } from '@/account/friendSort';
 import { alert } from '@/components/alert';
 import { Bookcase } from '@/components/shelf/Bookcase';
 import { Colors, Fonts } from '@/constants/theme';
+import { PULL_OUT_MS, useBookFlight, type SpineRect } from '@/library/bookFlight';
 import { useUi } from '@/store/uiStore';
 import { STATUS_LABELS, type Book } from '@/types';
 
 /** Lines of news shown at most; the rest is "and 3 more". */
 const NEWS_LINES = 5;
 
-/** What's known about a friend's book: who wrote it, and where it stands on their shelf. */
+/** A quick look at a friend's book (a long press): who wrote it, and where it stands on their shelf. */
 function showBook(book: Book) {
   const by = book.authors.length ? `by ${book.authors.join(', ')}` : '';
   const where = [STATUS_LABELS[book.status], book.owned ? null : 'not on their shelf'].filter(Boolean).join(' · ');
@@ -38,15 +41,15 @@ const FROM_HALLWAY = FadeIn.duration(450).reduceMotion(ReduceMotion.Never);
 const BACK_TO_HALLWAY = FadeOut.duration(450).reduceMotion(ReduceMotion.Never);
 
 /**
- * A friend's shelf, read-only: their books on a bookcase like yours, by genre. What's changed on it since you last
- * looked pops up over it, once.
+ * A friend's shelf, read-only: their books on a bookcase like yours, by genre; tapping one opens its page. What's changed
+ * on it since you last looked pops up over it, once.
  */
 export default function FriendShelfScreen() {
   const { id, name, from } = useLocalSearchParams<{ id: string; name?: string; from?: string }>();
   const insets = useSafeAreaInsets();
   const layoutMode = useUi((s) => s.layoutMode);
   const { setFriendBadge } = useAccount();
-  const [shelf, setShelf] = useState<{ friend: Friend; books: Book[] } | null>(() => cachedFriendShelf(id) ?? null);
+  const [shelf, setShelf] = useState<FriendShelf | null>(() => cachedFriendShelf(id) ?? null);
   const [problem, setProblem] = useState<string | null>(null);
   const [news, setNews] = useState<FriendNews[] | null>(null);
 
@@ -70,6 +73,19 @@ export default function FriendShelfScreen() {
   }, [id, setFriendBadge]);
 
   const title = shelf ? friendName(shelf.friend) : (name ?? '');
+
+  // Tapping a book opens its page, as on your own shelf: on the web it flies there from the shelf (see BookFlight).
+  const reduceMotion = useReducedMotion();
+  const startFlight = useBookFlight((f) => f.start);
+  const openBook = (book: Book, from?: SpineRect) => {
+    if (!shelf) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const open = () => router.push({ pathname: '/friends/[id]/book/[book]', params: { id, book: friendBookId(shelf, book), name: title } });
+    if (from && Platform.OS === 'web' && !reduceMotion) {
+      startFlight(book, from);
+      setTimeout(open, PULL_OUT_MS);
+    } else open();
+  };
 
   const remove = () =>
     alert(`Remove ${title}?`, 'You stop seeing each other’s shelves. They aren’t told, and either of you can ask again.', [
@@ -116,7 +132,7 @@ export default function FriendShelfScreen() {
           <Text style={styles.count}>
             {shelf.books.length} {shelf.books.length === 1 ? 'book' : 'books'} · {shelf.books.filter((b) => b.status === 'read').length} read
           </Text>
-          <Bookcase books={shelf.books} sortMode="genre" layoutMode={layoutMode} onOpen={showBook} onLongPress={showBook} bottomInset={insets.bottom} />
+          <Bookcase books={shelf.books} sortMode="genre" layoutMode={layoutMode} onOpen={openBook} onLongPress={showBook} bottomInset={insets.bottom} />
         </>
       )}
       {news && <NewsPopup news={news} onClose={() => setNews(null)} />}

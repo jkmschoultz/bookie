@@ -73,14 +73,21 @@ export const declineFriend = (requestId: string) => api('POST', `/api/friends/re
 /** Removes a friend, or takes back a request you sent. */
 export const removeFriend = (userId: string) => api('DELETE', `/api/friends/${encodeURIComponent(userId)}`);
 
+export interface FriendShelf {
+  friend: Friend;
+  books: Book[];
+  /** Each book's id in their account, in the same order as `books`: for opening one (see friendBookId). */
+  bookIds: string[];
+}
+
 /** A friend's books, kept for the visit so the hallway and their shelf don't fetch them twice. */
-const shelves = new Map<string, { friend: Friend; books: Book[] }>();
+const shelves = new Map<string, FriendShelf>();
 
 /**
  * A friend's shelf, as books the shelf components can draw. Friends only get what's on the shelf (FRIEND_FIELDS), so
  * the rest is left empty, and each book gets a local number of its own.
  */
-export async function getFriendShelf(userId: string, fresh = false): Promise<{ friend: Friend; books: Book[] }> {
+export async function getFriendShelf(userId: string, fresh = false): Promise<FriendShelf> {
   const known = shelves.get(userId);
   if (known && !fresh) return known;
   const res = await api<{ friend: Friend; books: (FriendBook & { id: string })[] }>('GET', `/api/friends/${encodeURIComponent(userId)}/books`);
@@ -89,16 +96,18 @@ export async function getFriendShelf(userId: string, fresh = false): Promise<{ f
     ...b,
     id: -(i + 1),
     source: 'manual' as const,
-    rating: null,
     dateAdded: '',
-    dateStarted: null,
-    dateFinished: null,
     notes: null,
   }));
-  const shelf = { friend: res.friend, books };
+  const shelf = { friend: res.friend, books, bookIds: res.books.map((b) => b.id) };
   shelves.set(userId, shelf);
   return shelf;
 }
+
+/** The id that opens one of a friend's books, which stays the same however their shelf changes. */
+export const friendBookId = (shelf: FriendShelf, book: Book) => shelf.bookIds[-book.id - 1];
+/** The book on a friend's shelf with that id, if it's still there. */
+export const friendBook = (shelf: FriendShelf, bookId: string): Book | undefined => shelf.books[shelf.bookIds.indexOf(bookId)];
 
 export const cachedFriendShelf = (userId: string) => shelves.get(userId);
 

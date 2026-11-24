@@ -489,7 +489,7 @@ function RequestSheet({ entry, onClose, onDone }: { entry: Entry | null; onClose
         <View style={{ flex: 1 }}>
           <Text style={styles.sheetTitle}>{shown.kind === 'incoming' ? `${name} wants to be friends` : 'Request sent'}</Text>
           <Text style={styles.sheetText}>
-            {shown.kind === 'incoming' ? `@${r.username}. Friends see each other’s shelves, not notes, ratings or dates.` : `${name} (@${r.username}) hasn’t answered yet.`}
+            {shown.kind === 'incoming' ? `@${r.username}. Friends see each other’s shelves, ratings and reading dates, never notes.` : `${name} (@${r.username}) hasn’t answered yet.`}
           </Text>
         </View>
       </View>

@@ -5,7 +5,8 @@ import { Colors } from '@/constants/theme';
 interface Props {
   label: string;
   selected?: boolean;
-  onPress: () => void;
+  /** Without it, the chip only shows something (a friend's status) and isn't a button. */
+  onPress?: () => void;
   small?: boolean;
 }
 
@@ -13,7 +14,8 @@ export function Chip({ label, selected, onPress, small }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="button"
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityState={{ selected }}
       style={[styles.chip, small && styles.small, selected && styles.selected]}>
       <Text style={[styles.text, small && styles.smallText, selected && styles.selectedText]}>{label}</Text>

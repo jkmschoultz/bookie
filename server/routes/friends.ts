@@ -8,7 +8,7 @@ import { activitySince, LATEST_SQL, UNSEEN_SQL } from './activity';
 /**
  * Friends: you ask someone by their exact username, they accept or decline, and either of you can remove the other.
  * Nobody can browse or search other users. A friend's shelf is visible to you once they've accepted, unless they've
- * hidden it, and only its books: no notes, ratings or reading dates (see FRIEND_FIELDS).
+ * hidden it, and only its books with their ratings and reading dates, never notes (see FRIEND_FIELDS).
  */
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}:${b}` : `${b}:${a}`);

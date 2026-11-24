@@ -21,6 +21,14 @@ describe('nextTransition', () => {
     expect(nextTransition(['/', '/book/3'], '/')).toEqual({ transition: null, trail: ['/'] });
   });
 
+  it('leaves the trip between a friend’s shelf and one of their books to the flying book too', () => {
+    const shelf = ['/', '/friends', '/friends/abc'];
+    expect(nextTransition(shelf, '/friends/abc/book/x1')).toEqual({ transition: null, trail: [...shelf, '/friends/abc/book/x1'] });
+    expect(nextTransition([...shelf, '/friends/abc/book/x1'], '/friends/abc')).toEqual({ transition: null, trail: shelf });
+    // Your own copy, opened from their book's page, rises as a sheet.
+    expect(nextTransition([...shelf, '/friends/abc/book/x1'], '/book/3')).toMatchObject({ transition: 'sheet-open' });
+  });
+
   it('leaves the trip between the Friends hallway and a friend’s shelf to the hallway’s turn', () => {
     expect(nextTransition(['/', '/friends'], '/friends/abc')).toEqual({ transition: null, trail: ['/', '/friends', '/friends/abc'] });
     expect(nextTransition(['/', '/friends', '/friends/abc'], '/friends')).toEqual({ transition: null, trail: ['/', '/friends'] });

@@ -23,6 +23,12 @@ export function duplicateKey(book: Pick<Book, 'title' | 'authors'>): string {
   return `${normalise(book.title)}|${normalise(book.authors[0] ?? '').replace(/ /g, '')}`;
 }
 
+/** Your copy of a book, if it's in the library already: the same ISBN, or the same title and first author. */
+export function findCopy(books: Book[], book: Pick<Book, 'isbn13' | 'title' | 'authors'>): Book | undefined {
+  const key = duplicateKey(book);
+  return books.find((b) => (book.isbn13 != null && b.isbn13 === book.isbn13) || duplicateKey(b) === key);
+}
+
 const filled = (v: unknown) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0);
 
 /** Fields that count towards "has more info" when choosing which copy to keep. */
