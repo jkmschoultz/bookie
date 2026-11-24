@@ -94,6 +94,31 @@ describe('groupBooks', () => {
   });
 });
 
+describe('recent activity', () => {
+  it('shelves books by the latest of their dates, newest first, with undated ones last', () => {
+    const books = [
+      makeBook({ title: 'Added late', dateAdded: '2024-06-20' }),
+      makeBook({ title: 'Finished in May', dateAdded: '2024-01-01', status: 'read', dateFinished: '2024-05-03' }),
+      makeBook({ title: 'Started in June', dateAdded: '2024-01-01', status: 'reading', dateStarted: '2024-06-02' }),
+      makeBook({ title: 'Friend copy', dateAdded: '', status: 'read', dateFinished: null }),
+    ];
+    const groups = groupBooks(books, 'activity');
+    expect(labels(groups)).toEqual(['June 2024', 'May 2024', 'Undated']);
+    expect(titles(groups[0].books)).toEqual(['Added late', 'Started in June']);
+    expect(titles(groups[1].books)).toEqual(['Finished in May']);
+  });
+
+  it('joins consecutive months into ranges that fill a shelf, labelled oldest to newest', () => {
+    const books = ['2024-01', '2024-02', '2024-03', '2024-04', '2024-05', '2024-06'].flatMap((m, i) =>
+      [1, 2].map((n) => makeBook({ title: `${m} ${n}`, status: 'read', dateFinished: `${m}-${10 + i}`, dateAdded: '2023-01-01' })),
+    );
+    const widthOf = (g: ShelfGroup) => g.books.length * 10;
+    const ranges = combineRanges(groupBooks(books, 'recent'), 40, widthOf);
+    expect(ranges.map((g) => g.label)).toEqual(['May 2024–Jun 2024', 'Mar 2024–Apr 2024', 'Jan 2024–Feb 2024']);
+    expect(ranges.map(widthOf)).toEqual([40, 40, 40]);
+  });
+});
+
 describe('combineRanges', () => {
   // Each book is 10px wide, so a group's width is 10 × its books.
   const widthOf = (g: ShelfGroup) => g.books.length * 10;

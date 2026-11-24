@@ -20,9 +20,11 @@ import {
 } from '@/account/friends';
 import { markViewed } from '@/account/friendSort';
 import { alert } from '@/components/alert';
+import { SortChips } from '@/components/SortBar';
 import { Bookcase } from '@/components/shelf/Bookcase';
 import { Colors, Fonts } from '@/constants/theme';
 import { PULL_OUT_MS, useBookFlight, type SpineRect } from '@/library/bookFlight';
+import type { SortMode } from '@/shelf/grouping';
 import { useUi } from '@/store/uiStore';
 import { STATUS_LABELS, type Book } from '@/types';
 
@@ -41,13 +43,15 @@ const FROM_HALLWAY = FadeIn.duration(450).reduceMotion(ReduceMotion.Never);
 const BACK_TO_HALLWAY = FadeOut.duration(450).reduceMotion(ReduceMotion.Never);
 
 /**
- * A friend's shelf, read-only: their books on a bookcase like yours, by genre; tapping one opens its page. What's changed
+ * A friend's shelf, read-only: their books on a bookcase like yours, sorted as you choose (by genre to start); tapping one opens its page. What's changed
  * on it since you last looked pops up over it, once.
  */
 export default function FriendShelfScreen() {
   const { id, name, from } = useLocalSearchParams<{ id: string; name?: string; from?: string }>();
   const insets = useSafeAreaInsets();
   const layoutMode = useUi((s) => s.layoutMode);
+  // Kept for this visit only: sorting a friend's shelf doesn't change your own.
+  const [sortMode, setSortMode] = useState<SortMode>('genre');
   const { setFriendBadge } = useAccount();
   const [shelf, setShelf] = useState<FriendShelf | null>(() => cachedFriendShelf(id) ?? null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -132,7 +136,10 @@ export default function FriendShelfScreen() {
           <Text style={styles.count}>
             {shelf.books.length} {shelf.books.length === 1 ? 'book' : 'books'} · {shelf.books.filter((b) => b.status === 'read').length} read
           </Text>
-          <Bookcase books={shelf.books} sortMode="genre" layoutMode={layoutMode} onOpen={openBook} onLongPress={showBook} bottomInset={insets.bottom} />
+          <View style={styles.sort}>
+            <SortChips sortMode={sortMode} onSortMode={setSortMode} />
+          </View>
+          <Bookcase books={shelf.books} sortMode={sortMode} layoutMode={layoutMode} onOpen={openBook} onLongPress={showBook} bottomInset={insets.bottom} />
         </>
       )}
       {news && <NewsPopup news={news} onClose={() => setNews(null)} />}
@@ -165,6 +172,7 @@ function NewsPopup({ news, onClose }: { news: FriendNews[]; onClose: () => void 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
   count: { color: Colors.textMuted, fontSize: 13, paddingHorizontal: 16, paddingVertical: 8 },
+  sort: { paddingBottom: 10 },
   message: { color: Colors.textMuted, fontSize: 15, textAlign: 'center', marginTop: 60, paddingHorizontal: 32, lineHeight: 21 },
   remove: { color: Colors.textMuted, fontSize: 15, paddingHorizontal: 4 },
   popupLayer: { ...StyleSheet.absoluteFill, alignItems: 'center', paddingTop: 44, paddingHorizontal: 20, backgroundColor: 'rgba(10,6,3,0.35)' },
