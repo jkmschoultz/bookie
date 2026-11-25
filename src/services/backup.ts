@@ -44,6 +44,7 @@ export function parseBackup(text: string): NewBook[] {
     dateAdded: today(),
     dateStarted: null,
     dateFinished: null,
+    statusChangedAt: null,
     notes: null,
   };
   const keys = Object.keys(defaults) as (keyof NewBook)[];

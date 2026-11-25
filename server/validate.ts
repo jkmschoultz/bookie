@@ -26,6 +26,14 @@ const list = (v: unknown, maxItems: number, maxLength: number): string[] => {
   if (!Array.isArray(v) || v.some((x) => typeof x !== 'string')) throw invalid();
   return v.slice(0, maxItems).map((x: string) => x.slice(0, maxLength));
 };
+/** A time, stored in one form (ISO, UTC) whatever the client sent. */
+const instant = (v: unknown): string | null => {
+  const s = text(v, 40);
+  if (s == null) return null;
+  const ms = Date.parse(s);
+  if (Number.isNaN(ms)) throw invalid();
+  return new Date(ms).toISOString();
+};
 const day = (v: unknown): string | null => {
   const s = text(v, 10);
   if (s != null && !DAY.test(s)) throw invalid();
@@ -66,6 +74,7 @@ function book(raw: unknown): NewBook {
     dateAdded: day(b.dateAdded) ?? '1970-01-01',
     dateStarted: day(b.dateStarted),
     dateFinished: day(b.dateFinished),
+    statusChangedAt: instant(b.statusChangedAt),
     notes: text(b.notes, 20_000),
   };
 }

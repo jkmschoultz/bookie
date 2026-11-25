@@ -34,6 +34,7 @@ export function exampleBook({ id, title, author, palette, pageCount = 420, heigh
     dateAdded: '2024-01-01',
     dateStarted: null,
     dateFinished: null,
+    statusChangedAt: null,
     notes: null,
   };
 }

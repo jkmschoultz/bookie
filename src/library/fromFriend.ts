@@ -35,6 +35,7 @@ export function fromFriend(book: Book, status: 'owned' | 'want'): NewBook {
     dateAdded: today(),
     dateStarted: null,
     dateFinished: null,
+    statusChangedAt: null,
     notes: null,
   };
 }

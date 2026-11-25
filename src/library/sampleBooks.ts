@@ -79,6 +79,7 @@ export function sampleBooks(): NewBook[] {
     dateAdded: `2022-0${1 + (i % 9)}-1${i % 10}`,
     dateStarted: status === 'reading' ? '2024-06-10' : null,
     dateFinished: finished ?? null,
+    statusChangedAt: null,
     notes: null,
   }));
 }

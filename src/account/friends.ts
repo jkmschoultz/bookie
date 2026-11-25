@@ -97,6 +97,8 @@ export async function getFriendShelf(userId: string, fresh = false): Promise<Fri
     id: -(i + 1),
     source: 'manual' as const,
     dateAdded: '',
+    // Private to you, so friends never have it: nothing to show or sort by.
+    statusChangedAt: null,
     notes: null,
   }));
   const shelf = { friend: res.friend, books, bookIds: res.books.map((b) => b.id) };

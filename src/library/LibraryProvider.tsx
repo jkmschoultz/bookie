@@ -7,6 +7,7 @@ import { deleteCoverPhotos } from '@/services/files';
 import type { Book, NewBook, ReadStatus } from '@/types';
 
 import type { DuplicateMerge } from './duplicates';
+import { applyChanges } from './mergeBooks';
 import { statusPatch } from './status';
 import { useCoverPalettes } from './useCoverPalettes';
 
@@ -75,8 +76,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       // A new cover means new spine colours: clear them so they're worked out again.
       const current = latest.current.find((b) => b.id === id);
       if (current && patch.coverUrl !== undefined && patch.coverUrl !== current.coverUrl) patch = { ...patch, coverPalette: null };
-      await repo.updateBook(db, id, patch);
-      setBooks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+      const saved = await repo.updateBook(db, id, patch);
+      setBooks((prev) => applyChanges(prev, new Map([[id, saved]])));
       notifyLocalChange();
     },
     [db],
@@ -94,13 +95,12 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const mergeDuplicates = useCallback(
     async (merges: DuplicateMerge[]) => {
       const ids = merges.flatMap((m) => m.remove.map((b) => b.id));
+      const saved = new Map<number, Partial<NewBook>>();
       await db.withTransactionAsync(async () => {
-        for (const m of merges) await repo.updateBook(db, m.keep.id, m.patch);
+        for (const m of merges) saved.set(m.keep.id, await repo.updateBook(db, m.keep.id, m.patch));
         await repo.deleteBooks(db, ids);
       });
-      const patches = new Map(merges.map((m) => [m.keep.id, m.patch]));
-      const removed = new Set(ids);
-      setBooks((prev) => prev.filter((b) => !removed.has(b.id)).map((b) => (patches.has(b.id) ? { ...b, ...patches.get(b.id) } : b)));
+      setBooks((prev) => applyChanges(prev, saved, new Set(ids)));
       notifyLocalChange();
       return ids.length;
     },

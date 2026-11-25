@@ -1,6 +1,6 @@
 import type { Book } from '@/types';
 
-export type SortMode = 'genre' | 'author' | 'title' | 'published' | 'recent';
+export type SortMode = 'genre' | 'author' | 'title' | 'published' | 'recent' | 'activity';
 
 export const SORT_LABELS: Record<SortMode, string> = {
   genre: 'Genre',
@@ -8,6 +8,7 @@ export const SORT_LABELS: Record<SortMode, string> = {
   title: 'Title',
   published: 'Published',
   recent: 'Recently read',
+  activity: 'Recent activity',
 };
 
 export interface ShelfGroup {
@@ -136,6 +137,21 @@ function byPublished(books: Book[]): ShelfGroup[] {
     }));
 }
 
+/** A shelf for one month ("2024-06"): labelled "June 2024", and spanning "Jun 2024" so neighbouring months can share a shelf. */
+function monthGroup(key: string, month: string, books: Book[]): ShelfGroup {
+  const [y, m] = month.split('-').map(Number);
+  return { key, label: `${MONTHS[m - 1]} ${y}`, span: `${MONTHS[m - 1].slice(0, 3)} ${y}`, books };
+}
+
+/**
+ * The latest of a book's dates, as a sortable ISO day: when it was added, started or finished, or its status last
+ * changed. Friends' copies have no added or status-change dates, so only their reading dates count.
+ */
+function latestActivity(book: Book): string {
+  const dates = [book.dateAdded, book.dateStarted, book.dateFinished, book.statusChangedAt?.slice(0, 10)];
+  return dates.filter(Boolean).sort().at(-1) ?? '';
+}
+
 function byRecent(books: Book[]): ShelfGroup[] {
   const reading = books.filter((b) => b.status === 'reading');
   const finished = books.filter((b) => b.dateFinished && b.status !== 'reading');
@@ -158,15 +174,24 @@ function byRecent(books: Book[]): ShelfGroup[] {
   if (readUndated.length) groups.push({ key: 'recent:read-undated', label: 'Read', books: readUndated.sort(compareShelfOrder) });
   const months = bucket(finished, (b) => b.dateFinished!.slice(0, 7));
   for (const month of [...months.keys()].sort().reverse()) {
-    const [y, m] = month.split('-').map(Number);
-    groups.push({
-      key: `recent:${month}`,
-      label: `${MONTHS[m - 1]} ${y}`,
-      books: months.get(month)!.sort((a, b) => cmp(b.dateFinished!, a.dateFinished!)),
-    });
+    groups.push(monthGroup(`recent:${month}`, month, months.get(month)!.sort((a, b) => cmp(b.dateFinished!, a.dateFinished!))));
   }
   if (dnfUndated.length) groups.push({ key: 'recent:dnf', label: 'Did not finish', books: dnfUndated.sort(newestAdded) });
   if (unread.length) groups.push({ key: 'recent:unread', label: 'Not yet read', books: unread.sort(newestAdded) });
+  return groups;
+}
+
+/** Every book by the month it was last added to or moved along on the shelf, newest first, like "Recently read". */
+function byActivity(books: Book[]): ShelfGroup[] {
+  const dated = books.filter((b) => latestActivity(b));
+  const undated = books.filter((b) => !latestActivity(b));
+  const months = bucket(dated, (b) => latestActivity(b).slice(0, 7));
+  const groups: ShelfGroup[] = [];
+  for (const month of [...months.keys()].sort().reverse()) {
+    const sorted = months.get(month)!.sort((a, b) => cmp(latestActivity(b), latestActivity(a)) || compareShelfOrder(a, b));
+    groups.push(monthGroup(`activity:${month}`, month, sorted));
+  }
+  if (undated.length) groups.push({ key: 'activity:undated', label: 'Undated', books: undated.sort(compareShelfOrder) });
   return groups;
 }
 
@@ -195,9 +220,10 @@ function rangeGroup(piece: ShelfGroup[]): ShelfGroup {
   const [first] = piece;
   const last = piece[piece.length - 1];
   if (piece.length === 1) return first;
-  // Label low to high whichever way the shelves run (decades are newest first): "A–D", "1960s–1980s".
-  const [low, high] = [first.span!, last.span!].sort(cmp);
-  return { key: `${first.key}–${last.span}`, label: `${low}–${high}`, books: piece.flatMap((g) => g.books) };
+  // Label low to high whichever way the shelves run (decades and months are newest first): "A–D", "1960s–1980s".
+  // Keys sort the same way as the periods they name, so they give the order.
+  const [low, high] = [first, last].sort((a, b) => cmp(a.key, b.key));
+  return { key: `${first.key}–${last.span}`, label: `${low.span}–${high.span}`, books: piece.flatMap((g) => g.books) };
 }
 
 /**
@@ -240,5 +266,7 @@ export function groupBooks(books: Book[], mode: SortMode): ShelfGroup[] {
       return byPublished(copy);
     case 'recent':
       return byRecent(copy);
+    case 'activity':
+      return byActivity(copy);
   }
 }

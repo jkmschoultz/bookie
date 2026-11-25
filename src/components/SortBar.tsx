@@ -10,16 +10,23 @@ import { Chip } from './Chip';
 const SORT_MODES = Object.keys(SORT_LABELS) as SortMode[];
 const STATUSES: ReadStatus[] = ['reading', 'read', 'owned', 'want', 'dnf'];
 
+/** The sort choices as chips. Your shelf keeps its sort in the UI store; a friend's shelf passes its own. */
+export function SortChips({ sortMode, onSortMode }: { sortMode: SortMode; onSortMode: (mode: SortMode) => void }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      {SORT_MODES.map((mode) => (
+        <Chip key={mode} label={SORT_LABELS[mode]} selected={sortMode === mode} onPress={() => onSortMode(mode)} />
+      ))}
+    </ScrollView>
+  );
+}
+
 export function SortBar() {
   const { sortMode, setSortMode, statusFilter, toggleStatus, ownedFilter, setOwnedFilter, clearFilters } = useUi();
 
   return (
     <View style={styles.container}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {SORT_MODES.map((mode) => (
-          <Chip key={mode} label={SORT_LABELS[mode]} selected={sortMode === mode} onPress={() => setSortMode(mode)} />
-        ))}
-      </ScrollView>
+      <SortChips sortMode={sortMode} onSortMode={setSortMode} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         <Chip small label="All" selected={statusFilter.length === 0 && ownedFilter === null} onPress={clearFilters} />
         {STATUSES.map((s) => (

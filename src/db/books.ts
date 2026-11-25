@@ -34,6 +34,7 @@ interface BookRow {
   date_added: string;
   date_started: string | null;
   date_finished: string | null;
+  status_changed_at: string | null;
   notes: string | null;
   uid: string;
   updated_at: number;
@@ -65,6 +66,7 @@ const COLUMNS = {
   dateAdded: 'date_added',
   dateStarted: 'date_started',
   dateFinished: 'date_finished',
+  statusChangedAt: 'status_changed_at',
   notes: 'notes',
 } as const satisfies Record<keyof NewBook, keyof BookRow>;
 
@@ -93,6 +95,7 @@ function fromRow(r: BookRow): Book {
     dateAdded: r.date_added,
     dateStarted: r.date_started,
     dateFinished: r.date_finished,
+    statusChangedAt: r.status_changed_at,
     notes: r.notes,
   };
 }
@@ -132,11 +135,19 @@ export async function insertBooks(db: SQLiteDatabase, books: NewBook[]): Promise
 /** Marks a book changed: stamped now, or just after its last change if this device's clock is behind. */
 const CHANGED = 'updated_at = max(?, updated_at + 1), dirty = 1';
 
-export async function updateBook(db: SQLiteDatabase, id: number, patch: Partial<NewBook>): Promise<void> {
-  const keys = (Object.keys(patch) as (keyof NewBook)[]).filter((k) => k in COLUMNS);
-  if (!keys.length) return;
+/** Saves a change to a book. Returns what was saved, including any stamp it got, so the shelf in memory can match. */
+export async function updateBook(db: SQLiteDatabase, id: number, patch: Partial<NewBook>): Promise<Partial<NewBook>> {
+  let changes = patch;
+  // A new status is stamped as changed now, unless the caller says when.
+  if ('status' in patch && !('statusChangedAt' in patch)) {
+    const row = await db.getFirstAsync<Pick<BookRow, 'status'>>('SELECT status FROM books WHERE id = ?', id);
+    if (row && row.status !== patch.status) changes = { ...patch, statusChangedAt: new Date().toISOString() };
+  }
+  const keys = (Object.keys(changes) as (keyof NewBook)[]).filter((k) => k in COLUMNS);
+  if (!keys.length) return {};
   const sql = `UPDATE books SET ${keys.map((k) => `${COLUMNS[k]} = ?`).join(', ')}, ${CHANGED} WHERE id = ?`;
-  await db.runAsync(sql, [...keys.map((k) => toValue(k, patch[k])), Date.now(), id]);
+  await db.runAsync(sql, [...keys.map((k) => toValue(k, changes[k])), Date.now(), id]);
+  return changes;
 }
 
 export async function deleteBook(db: SQLiteDatabase, id: number): Promise<void> {

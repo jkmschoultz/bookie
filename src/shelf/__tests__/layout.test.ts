@@ -1,6 +1,7 @@
 import { makeBook } from '@/test/makeBook';
 
-import type { ShelfGroup } from '../grouping';
+import { arrangeShelves } from '../arrange';
+import { SORT_LABELS, type ShelfGroup, type SortMode } from '../grouping';
 import { BOOKEND_WIDTH, LABEL_MAX_WIDTH, labelPlateWidth, layoutShelves } from '../layout';
 import { MARKER_REACH } from '../spineCues';
 
@@ -78,6 +79,38 @@ describe('layoutShelves', () => {
       expect(m.markerRoom).toBeGreaterThan(MARKER_REACH.slip);
       expect(m.width).toBe(p.width + m.markerRoom);
     });
+  });
+
+  it('can lay a pile on a shelf in every sort, not just genre', () => {
+    // A pile comes from a group of 5+ books, whatever sort made it. Each sort is tried on several libraries, since
+    // whether a given group gets a pile depends on its key.
+    const library = (seed: number) =>
+      Array.from({ length: 120 }, (_, i) => {
+        const n = i + seed * 1000;
+        const month = String(1 + (n % 12)).padStart(2, '0');
+        return makeBook({
+          title: `${String.fromCharCode(65 + (n % 26))}itle ${n}`,
+          authors: [`Author ${(n + seed) % 12}`],
+          genres: [`Genre ${seed}-${n % 6}`],
+          publishedYear: 1900 + ((n * 37) % 120),
+          status: 'read',
+          dateAdded: '2023-01-01',
+          dateFinished: `2024-${month}-10`,
+          statusChangedAt: `2024-${month}-02T00:00:00.000Z`,
+          pageCount: 200 + ((n * 13) % 300),
+        });
+      });
+    for (const sortMode of Object.keys(SORT_LABELS) as SortMode[]) {
+      let piles = 0;
+      for (let seed = 0; seed < 10; seed++) {
+        for (const shelfWidth of [390, 900, 1300]) {
+          piles += arrangeShelves(library(seed), { sortMode, layoutMode: 'row', shelfWidth, zoom: 1, gap: 1 })
+            .flatMap((r) => r.items)
+            .filter((i) => i.kind === 'stack').length;
+        }
+      }
+      expect({ sortMode, piles: piles > 0 }).toEqual({ sortMode, piles: true });
+    }
   });
 
   it('never stacks books in small groups', () => {

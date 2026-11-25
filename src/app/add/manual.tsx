@@ -141,6 +141,7 @@ export default function BookFormScreen() {
     dateAdded: today(),
     dateStarted: null,
     dateFinished: null,
+    statusChangedAt: null,
     notes: null,
   };
 
@@ -198,6 +199,7 @@ export default function BookFormScreen() {
       dateAdded: today(),
       dateStarted: status === 'reading' ? today() : null,
       dateFinished: status === 'read' ? today() : null,
+      statusChangedAt: null,
       notes: null,
     });
     setDraft(null);
